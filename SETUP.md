@@ -16,9 +16,9 @@ information yourself, outside the chat, and do not bring protected results back 
 institution login alone does not establish approval (at Stanford, Claude is not approved for PHI
 at all). Bonsai does not check files for protected information; it refuses a job that declares
 `--data moderate|high|phi` before it reads a file, wherever it runs from, and undeclared data is
-routed. Bonsai prints this notice before your first job and at `install-skill`, asks you to
-acknowledge it when you add an institution account, and prints a one-line reminder on every
-chat-driven job to one. **If an agent sets this up for you, it must show you this notice in its
+routed. Bonsai asks you to acknowledge this notice once, when you add your first institution
+account (or prints it once before your first job, if that comes first), and prints a one-line
+reminder on every chat-driven job to an institution account. **If an agent sets this up for you, it must show you this notice in its
 reply before routing any work; completing a browser sign-in does not acknowledge it.**
 
 ## What Bonsai needs
@@ -123,7 +123,8 @@ bonsai login you@stanford.edu --codex  --institution
 ```
 
 The first `--institution` prints the notice from the top of this file and asks you to type
-`I understand` — into this Terminal window, then Return (not into the browser or a chat). When
+`I understand` — into this Terminal window, then Return (not into the browser or a chat). It asks
+once, on this first login only; the second line and everything after it do not ask again. When
 the command is run by a script or an agent rather than a person, the notice is printed and the
 sign-in proceeds without that prompt, which is why the agent must show you the notice itself.
 Each line then opens the provider's sign-in page in your browser; pick the institution organization

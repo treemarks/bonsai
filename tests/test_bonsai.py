@@ -305,12 +305,54 @@ class Discovery(unittest.TestCase):
     def test_notice_is_shown_once_per_version(self):
         import io, contextlib
         cfg = bonsai.load_config()
+        cfg.pop("notice_shown", None)  # the tests share one fake home; start before any showing
+        bonsai.save_config(cfg)
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             bonsai.ensure_notice(cfg, "job")
             bonsai.ensure_notice(cfg, "job")
         self.assertEqual(err.getvalue().count("Before you use Bonsai"), 1)
         self.assertEqual(bonsai.load_config()["notice_shown"]["version"], bonsai.NOTICE_VERSION)
+
+    def test_acknowledgement_is_asked_once_per_machine(self):
+        import io, contextlib, shutil, subprocess, builtins, argparse
+        saved = (shutil.which, subprocess.call, sys.stdin, builtins.input)
+        asked = []
+        shutil.which = lambda name: "/usr/local/bin/" + name
+        subprocess.call = lambda argv, env=None: 0
+        class Tty(io.StringIO):
+            def isatty(self):
+                return True
+        sys.stdin = Tty()  # a terminal, so the prompt path runs; `input` below answers it
+        cfg = bonsai.load_config()
+        cfg.pop("notice_shown", None)
+        cfg.pop("acknowledged", None)
+        bonsai.save_config(cfg)
+        try:
+            builtins.input = lambda prompt="": asked.append(prompt) or "I understand"
+            def login(email, provider):
+                a = argparse.Namespace(email=email, name=None, institution=True, acknowledge=False, sso=False,
+                                       claude=provider == "claude", codex=provider == "codex")
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    rc = bonsai.cmd_login(a, bonsai.load_config())
+                return rc, out.getvalue()
+            rc, out = login("a@stanford.edu", "claude")
+            self.assertEqual((rc, len(asked)), (0, 1))
+            self.assertIn("Before you use Bonsai", out)
+            rc, out = login("a@stanford.edu", "codex")        # same e-mail, other provider
+            rc2, out2 = login("b@othercollege.edu", "codex")  # a different institution login
+            self.assertEqual((rc, rc2, len(asked)), (0, 0, 1))
+            self.assertNotIn("Before you use Bonsai", out + out2)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                bonsai.ensure_notice(bonsai.load_config(), "job")  # the first job: no second printing
+            self.assertEqual(err.getvalue(), "")
+            cfg = bonsai.load_config()
+            self.assertEqual(cfg["acknowledged"]["pool"], "a@stanford.edu")
+            self.assertEqual(cfg["notice_shown"]["how"], "login")
+        finally:
+            shutil.which, subprocess.call, sys.stdin, builtins.input = saved
 
     def test_display_text_escapes_controls(self):
         self.assertEqual(bonsai.display_text("a\x1b[2Jb\n"), "a\\u001b[2Jb\\u000a")

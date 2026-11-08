@@ -72,7 +72,7 @@ MIN_USABLE_PCT = 10.0        # under this much room a login is held, not routed 
 DEFAULT_INTERVAL = 300       # seconds between probes; the floor is 180
 FILE_LIMIT = 400_000         # bytes of one -f file that go into a prompt
 PROMPT_LIMIT = 1_600_000     # bytes of the whole prompt
-VERSION = "0.2.0"
+VERSION = "0.2.2"
 USER_AGENT = "bonsai/%s (+https://github.com/treemarks/bonsai)" % VERSION
 
 # How to get each tool on a machine that has nothing. `bonsai doctor` prints the line for
@@ -116,7 +116,8 @@ DEFAULT_CONFIG = {
     # shows numbers only for people who turn this on, having read README §Terms.
     # Codex usage comes from Codex's own app-server; Codex holds the credential.
     "usage_reads": {"claude": False, "codex": True},
-    # pool -> date the user saw the notice at `bonsai login --institution`.
+    # The one time the notice was acknowledged at `bonsai login --institution` ({"at", "pool"}):
+    # asked once per machine, the first time, and never again, however many logins follow.
     "acknowledged": {},
     # The notice (NOTICE_VERSION) was also shown before the first job / at install-skill: how and when.
     # A record that it was printed, not proof that a person read it.
@@ -1405,7 +1406,7 @@ def cmd_login(a, cfg) -> int:
     d = pool_dir(provider, pool)
     private_dir(d)
     name = a.name or login_name(cfg, pool)
-    acknowledged = (cfg.get("acknowledged") or {}).get(pool)
+    acknowledged = bool(cfg.get("acknowledged"))  # once per machine, not per login
     if a.institution and not acknowledged:
         print(INSTITUTION_NOTICE % {"name": name})
         if not getattr(a, "acknowledge", False) and sys.stdin.isatty():
@@ -1424,7 +1425,10 @@ def cmd_login(a, cfg) -> int:
     entry["name"] = name
     entry.setdefault("institutions", {})[provider] = bool(a.institution)
     if a.institution and not acknowledged:
-        cfg.setdefault("acknowledged", {})[pool] = _iso(_now())
+        now = _iso(_now())
+        cfg["acknowledged"] = {"at": now, "pool": pool}
+        # Acknowledged is shown: the first job and install-skill do not print the notice again.
+        cfg["notice_shown"] = {"version": NOTICE_VERSION, "how": "login", "at": now}
     save_config(cfg)
     print("bonsai: %s pool %s recorded as %s%s" % (provider, pool, name, " (marked institution by you)" if a.institution else ""))
     if a.institution:
@@ -1460,9 +1464,10 @@ def _data_gate(data: str | None, kind: str, chat: bool, provider: str | None) ->
 
 
 def ensure_notice(cfg: dict, how: str) -> None:
-    """Print the notice once per version before the first job on this machine (and at
-    install-skill), and record how it was shown. It reaches whoever is at the terminal, which may
-    be an agent; the skill tells the agent to relay it, and the docs tell the human to expect it."""
+    """Print the notice once per version on this machine, before the first job or at install-skill,
+    unless `bonsai login --institution` already had it acknowledged, and record how it was shown.
+    It reaches whoever is at the terminal, which may be an agent; the skill tells the agent to
+    relay it, and the docs tell the human to expect it."""
     shown = cfg.get("notice_shown") or {}
     if shown.get("version") == NOTICE_VERSION:
         return

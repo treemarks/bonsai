@@ -68,7 +68,9 @@ bonsai login you@stanford.edu --codex  --institution    # opens the ChatGPT sign
 ```
 
 The first `--institution` prints the notice above and, in a Terminal, asks you to type
-`I understand` (typed into that Terminal window, then Return); the date is recorded. If an agent
+`I understand` (typed into that Terminal window, then Return); the date is recorded. That is the
+only time it asks: the second login, later logins and the first job do not repeat it (only a new
+version of the notice prints again, once, without the prompt). If an agent
 runs the setup for you, the notice reaches the agent's output, not your eyes: the skill tells the
 agent to relay it before its first route, and HANDOFF.md tells you to expect that. Each login lands
 in `~/.claude-pools/you@stanford.edu` or

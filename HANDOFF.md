@@ -17,8 +17,9 @@ classes Moderate or High Risk — open a tool and account Stanford approves for 
 yourself, outside the chat, and do not bring the results back into the chat. A Stanford login alone
 is not approval: Stanford's Claude, for example, is not approved for PHI at all (its AI API Gateway
 is). Bonsai does not check your files; it refuses a job that declares `--data moderate|high|phi`
-before it reads a file, and otherwise routes what you give it. It prints this notice before your
-first job, at `install-skill`, and asks you to acknowledge it when you add the Stanford accounts.
+before it reads a file, and otherwise routes what you give it. It asks you to acknowledge this
+notice once, when you add your first Stanford account; after that it does not ask again (a one-line
+reminder rides on each chat-driven job to a Stanford account).
 
 **If you let Claude Code do the setup for you from this file:** it must show you this notice in
 its reply before it routes any work. Finishing a browser sign-in does not count as having read it.
