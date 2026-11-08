@@ -55,6 +55,20 @@ class Parsing(unittest.TestCase):
         d["rate_limit"]["limit_reached"] = True
         self.assertTrue(bonsai.parse_codex_usage(d)["limited"])
 
+    def test_codex_rate_limits_from_app_server(self):
+        res = {"rateLimits": {"planType": "edu", "rateLimitReachedType": None, "spendControlReached": False,
+                              "primary": {"usedPercent": 0, "windowDurationMins": 10080, "resetsAt": int(NOW + 5 * 86400)},
+                              "secondary": {"usedPercent": 37.5, "windowDurationMins": 300, "resetsAt": int(NOW + 3000)}}}
+        r = bonsai.parse_codex_rate_limits(res)
+        self.assertEqual(r["plan"], "edu")
+        self.assertEqual(r["wk"], 0)
+        self.assertEqual(r["5h"], 37.5)
+        self.assertAlmostEqual(r["5h_at"], NOW + 3000, delta=2)
+        self.assertNotIn("limited", r)
+        res["rateLimits"]["rateLimitReachedType"] = "primary"
+        self.assertTrue(bonsai.parse_codex_rate_limits(res)["limited"])
+        self.assertEqual(bonsai.parse_codex_rate_limits({})["plan"], None)
+
     def test_when(self):
         self.assertAlmostEqual(bonsai._when_ts(1700000000), 1700000000)
         self.assertAlmostEqual(bonsai._when_ts(1700000000000), 1700000000)   # milliseconds
@@ -140,15 +154,63 @@ class Routing(unittest.TestCase):
         self.assertIn("dontAsk", a)
         self.assertIn("-p", a)
 
+    def test_pick_signed_in_only_login(self):
+        # Usage reads off for Claude: one personal login reads `signed-in`; auto picks it.
+        st = {"at": NOW, "rows": [{"pool": "default", "provider": "claude", "state": "signed-in",
+                                   "name": "personal", "institution": False}]}
+        self.assertEqual(bonsai.pick(st, "claude", "general", None, bonsai.load_config())["pool"], "default")
+
     def test_child_env_drops_parent_marks(self):
         os.environ["CLAUDECODE"] = "1"
         os.environ["CLAUDE_CONFIG_DIR"] = "/elsewhere"
+        os.environ["ANTHROPIC_API_KEY"] = "sk-test"
+        os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = "tok"
+        os.environ["OPENAI_API_KEY"] = "sk-test"
         env = bonsai.child_env("codex", "me@stanford.edu")
-        self.assertNotIn("CLAUDECODE", env)
-        self.assertNotIn("CLAUDE_CONFIG_DIR", env)
+        for k in ("CLAUDECODE", "CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY"):
+            self.assertNotIn(k, env)
         self.assertEqual(env["CODEX_HOME"], os.path.join(FAKE, ".codex-pools", "me@stanford.edu"))
+        # The default pool is the CLI's own home, reached by leaving the variable unset.
         env = bonsai.child_env("claude", "default")
-        self.assertEqual(env["CLAUDE_CONFIG_DIR"], os.path.join(FAKE, ".claude"))
+        self.assertNotIn("CLAUDE_CONFIG_DIR", env)
+        env = bonsai.child_env("codex", "default")
+        self.assertNotIn("CODEX_HOME", env)
+        for k in ("CLAUDECODE", "CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY"):
+            os.environ.pop(k, None)
+
+    def test_chat_driven_detection(self):
+        for k in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX"):
+            os.environ.pop(k, None)
+        self.assertFalse(bonsai.chat_driven())
+        os.environ["CLAUDECODE"] = "1"
+        self.assertTrue(bonsai.chat_driven())
+        os.environ.pop("CLAUDECODE")
+        os.environ["CODEX_SANDBOX"] = "seatbelt"
+        self.assertTrue(bonsai.chat_driven())
+        os.environ.pop("CODEX_SANDBOX")
+
+    def test_limited_and_sensitive_rules(self):
+        cfg = bonsai.load_config()
+        st = rows()
+        st["rows"][0]["state"] = "LIMITED"       # personal codex at its limit
+        order = bonsai.route(st, "codex", "general")
+        self.assertNotIn("default", [e["pool"] for e in order])
+        with self.assertRaises(SystemExit):      # a named login is not a way around a stop
+            bonsai.pick(st, "codex", "general", "personal", cfg)
+        with self.assertRaises(SystemExit):      # sensitive never runs on a named personal login
+            bonsai.pick(rows(), "codex", "sensitive", "gmail", cfg)
+        self.assertEqual(bonsai.pick(rows(), "codex", "sensitive", "stanford", cfg)["pool"], "me@stanford.edu")
+
+    def test_claude_jobs_run_without_tools(self):
+        a = bonsai.headless_argv("claude", "claude-haiku-5-5", "low", None, "/tmp")
+        self.assertIn("--tools", a)
+        self.assertEqual(a[a.index("--tools") + 1], "")
+        self.assertIn("--strict-mcp-config", a)
+
+    def test_tool_name(self):
+        self.assertEqual(bonsai._tool_name(r"C:\Users\x\codex.exe"), "codex" if os.sep == "\\" else r"c:\users\x\codex")
+        self.assertEqual(bonsai._tool_name("/opt/homebrew/bin/codex"), "codex")
+        self.assertEqual(bonsai._tool_name("codex.cmd"), "codex")
 
 
 class Discovery(unittest.TestCase):
@@ -187,23 +249,41 @@ class Discovery(unittest.TestCase):
     def test_config_set_keeps_dots_in_emails(self):
         import argparse
         cfg = bonsai.load_config()
-        a = argparse.Namespace(set=['logins.me@stanford.edu={"name":"stanford","institution":true}',
+        a = argparse.Namespace(set=['logins.me@stanford.edu={"name":"stanford","institutions":{"codex":true}}',
                                     'models.astra=["codex","gpt-6-astra"]', "interval=600"])
         import io, contextlib
         with contextlib.redirect_stdout(io.StringIO()):
             bonsai.cmd_config(a, cfg)
         saved = bonsai.load_config()
-        self.assertTrue(saved["logins"]["me@stanford.edu"]["institution"])
+        self.assertTrue(saved["logins"]["me@stanford.edu"]["institutions"]["codex"])
         self.assertEqual(saved["models"]["astra"], ["codex", "gpt-6-astra"])
         self.assertEqual(saved["interval"], 600)
-        self.assertTrue(bonsai.is_institution(saved, "me@stanford.edu"))
+        self.assertTrue(bonsai.is_institution(saved, "me@stanford.edu", "codex"))
+        self.assertFalse(bonsai.is_institution(saved, "me@stanford.edu", "claude"))   # per provider
+        with self.assertRaises(SystemExit):                                           # unknown keys are refused
+            bonsai.cmd_config(argparse.Namespace(set=['access_token="x"']), bonsai.load_config())
 
     def test_annotate_reads_config_not_cache(self):
         cfg = bonsai.load_config()
-        cfg.setdefault("logins", {})["me@stanford.edu"] = {"name": "farm", "institution": True}
-        state = bonsai.annotate({"rows": [{"pool": "me@stanford.edu", "provider": "codex", "institution": False, "name": "x"}]}, cfg)
+        cfg.setdefault("logins", {})["me@stanford.edu"] = {"name": "farm", "institutions": {"codex": True}}
+        state = bonsai.annotate({"rows": [{"pool": "me@stanford.edu", "provider": "codex", "institution": False, "name": "x"},
+                                          {"pool": "me@stanford.edu", "provider": "claude", "institution": True, "name": "x"}]}, cfg)
         self.assertEqual(state["rows"][0]["name"], "farm")
         self.assertTrue(state["rows"][0]["institution"])
+        self.assertFalse(state["rows"][1]["institution"])
+
+    def test_private_handoff_refuses_declared_data_from_a_chat(self):
+        with self.assertRaises(SystemExit) as cm:
+            bonsai._data_gate("high", "general", True, "codex")
+        self.assertIn("not routed", str(cm.exception))
+        self.assertEqual(bonsai._data_gate("high", "general", False, "codex"), "sensitive")   # a person at a terminal
+        self.assertEqual(bonsai._data_gate("low", "general", True, "codex"), "general")       # never blocks low
+        with self.assertRaises(SystemExit):
+            bonsai._data_gate("restricted", "general", False, "codex")                      # never, anywhere
+
+    def test_display_text_escapes_controls(self):
+        self.assertEqual(bonsai.display_text("a\x1b[2Jb\n"), "a\\u001b[2Jb\\u000a")
+        self.assertEqual(bonsai.display_text("plain", 3), "pla")
 
     def test_user_agent_is_bonsai(self):
         h = bonsai._claude_headers("tok")
