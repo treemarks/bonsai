@@ -4,17 +4,22 @@ Written so that a person, or the coding agent they paste it to, can follow it to
 fresh macOS 26 or 27 install. Every step says how to check whether it is already done. Windows
 is later; the last section says what is already in place for it.
 
-**Read this before anything else.** Bonsai lets a chat you are already in (Claude Code or Codex,
-on your own login) send a job to an institution seat such as Stanford's Claude or ChatGPT Edu.
-That job goes *through* the chat: the chat writes the task, Bonsai runs it on the seat, and the
-chat reads the answer, all on the chat's own login. The seat's protections — your institution's
-agreement, no training, its data-risk approvals — cover the seat's own call and nothing else.
-Routing a job does not extend them to the chat that asked for it. So Bonsai is for work that may
-sit in that chat anyway. For PHI, PII, student records or anything your institution classes
-Moderate or High Risk, do not route a job at all: use the institution's own tools directly, as a
-person (its Claude or ChatGPT in the browser, or a Terminal window you open yourself and sign in to
-the seat). Bonsai says this once when you add an institution seat, refuses a chat-driven job that
-declares such data before it reads a file, and prints a reminder on every chat-driven job to a seat.
+**Read this before anything else.** When you ask a chat you are already in (Claude Code or Codex,
+on your own account) to run a job on an institution account such as Stanford's Claude or ChatGPT
+Edu, that chat can see the task and the results, and handles them under its own account and
+settings. Choosing the institution account for the job does not give the chat the institution's
+protections. So only route work that is allowed in the chat you started from; ordinary personal
+work is fine, and you remain responsible for what you share. For protected information —
+confidential student records, research interviews, health records, anything your institution
+classes Moderate or High Risk — open a tool and account your institution approves for that
+information yourself, outside the chat, and do not bring protected results back into the chat. An
+institution login alone does not establish approval (at Stanford, Claude is not approved for PHI
+at all). Bonsai does not check files for protected information; it refuses a job that declares
+`--data moderate|high|phi` before it reads a file, wherever it runs from, and undeclared data is
+routed. Bonsai prints this notice before your first job and at `install-skill`, asks you to
+acknowledge it when you add an institution account, and prints a one-line reminder on every
+chat-driven job to one. **If an agent sets this up for you, it must show you this notice in its
+reply before routing any work; completing a browser sign-in does not acknowledge it.**
 
 ## What Bonsai needs
 
@@ -44,11 +49,13 @@ If either is missing, macOS offers to install the tools the first time you run `
 xcode-select --install
 ```
 
-Wait for the graphical installer to finish (a few minutes), then open a **new** Terminal window.
+The Terminal prompt comes back before the installer is done. Stop here until the installer window
+says it has finished (a few minutes), then open a **new** Terminal window and rerun the check.
 
 ## 2. Claude Code
 
-Check: `claude --version`.
+Check: `"$HOME/.local/bin/claude" --version` (plain `claude --version` works after step 4 puts
+that folder on your PATH).
 
 Native installer, no Homebrew or Node needed:
 
@@ -62,7 +69,7 @@ have Node.
 
 ## 3. Codex CLI
 
-Check: `codex --version`.
+Check: `"$HOME/.local/bin/codex" --version` (plain `codex --version` after step 4).
 
 The release binary, for whichever chip the Mac has, needing nothing else installed:
 
@@ -93,8 +100,9 @@ bonsai doctor
 ```
 
 `bonsai doctor` lists what is installed and which logins it can see, prints the install line for
-anything missing, and exits non-zero until `git`, `claude` and `codex` all answer. Before step 5
-it shows the two `default` pools as `no-login`; that is expected.
+anything missing, and exits non-zero until `git`, `claude` and `codex` all answer. Exit 0 means
+the three tools answered their version checks, nothing more: read the login lines yourself. Before
+step 5 it shows the two `default` pools as `no-login`; that is expected.
 
 ## 5. Sign in
 
@@ -105,7 +113,9 @@ claude          # follow the sign-in in the browser; then /exit
 codex           # follow the sign-in in the browser; then Ctrl-C
 ```
 
-Those become the `personal` row on the board. Then each institution seat as its own pool:
+Those become the `personal` row on the board. Then each institution account as its own pool.
+These are separate saved sign-ins: adding Stanford does not change the account of any chat you
+have open.
 
 ```bash
 bonsai login you@stanford.edu --claude --institution
@@ -113,12 +123,17 @@ bonsai login you@stanford.edu --codex  --institution
 ```
 
 The first `--institution` prints the notice from the top of this file and asks you to type
-`I understand`. Each line then opens the provider's sign-in page in your browser; pick the
-institution organization or workspace when asked. The seat is recorded as an institution seat
-for that provider only when its sign-in completes.
+`I understand` — into this Terminal window, then Return (not into the browser or a chat). When
+the command is run by a script or an agent rather than a person, the notice is printed and the
+sign-in proceeds without that prompt, which is why the agent must show you the notice itself.
+Each line then opens the provider's sign-in page in your browser; pick the institution organization
+or workspace when asked. The account is recorded as an institution account for that provider only
+when its sign-in completes.
 
-Then `bonsai doctor` again: it should now show each login as `signed in as ...`, the Stanford
-ones marked `⌂ institution`.
+Then `bonsai doctor` again: it should now show each login as `signed in as ...` with its account
+and organization, the Stanford ones marked `⌂ institution (marked by you; workspace approval not
+verified)`. Check the account and organization shown: your university e-mail and the `⌂` mark do
+not prove you picked the university workspace, and neither proves approval for any data.
 
 ## 6. Check it works
 
@@ -134,10 +149,13 @@ eligible login for general work). With only an institution Codex seat, test
 `bonsai job stanford-codex -o /tmp/hi.md "Reply with exactly: ok"` instead; Claude sign-in is
 needed only for Claude jobs.
 
-Optional, and worth a minute's thought: `bonsai install-skill` teaches Claude Code the routing
-words. Read the file it writes (it says what the agent will do with the words, including that it
-never routes protected data from a chat). If you use Bonsai for institution work, your unit may
-want to review that file first; Stanford asks that of repeatable AI workflows and skills.
+Optional, and worth a minute's thought: `bonsai install-skill` prints the notice and teaches
+Claude Code the routing words. Read the file it writes: it is what the agent will do with the words,
+including stopping when it recognizes protected data and relaying the notice before its first
+route. It does not detect protected information; undeclared data is routed. If you will use Bonsai
+with university data, someone in your unit should review that file first; Stanford asks that of
+repeatable AI workflows and skills. If the command says **NOT UPDATED**, Claude Code is still
+using an older or edited skill; review the `.new` file it left and move it over yourself.
 
 Run the tests any time: `/usr/bin/python3 -m unittest discover -s ~/code/bonsai/tests`.
 
@@ -145,6 +163,7 @@ Run the tests any time: `/usr/bin/python3 -m unittest discover -s ~/code/bonsai/
 
 - `signed-in` on a Claude row with no numbers: normal. Bonsai does not read Claude's usage unless
   you turn that on (README §What Bonsai reads); it shows the login's plan from Claude Code itself.
+  It confirms the sign-in only; it does not measure remaining usage or certify any data approval.
 - `re-login`: the sign-in lapsed; run the same `bonsai login` line (or `claude` / `codex`) again.
 - `locked` or `keychain-timeout` (only with Claude usage reads on): the credential could not be
   read in this shell — over SSH, or the macOS allow dialog went unanswered. Run the board in a

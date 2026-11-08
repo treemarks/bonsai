@@ -5,23 +5,29 @@ yourself); either way the steps are the same.
 
 ## First, the one thing to know
 
-Bonsai lets the chat you are in — Claude Code, on your personal Pro login — send a job to your
-Stanford Claude or Stanford Codex seat. That job goes **through** the chat: the chat writes the
-task, Bonsai runs it on the seat, and the chat reads the answer, on your personal login. So the
-Stanford seat's protections (Stanford's agreement, no training, its data-risk approvals) cover the
-seat's own call and nothing else. Routing does not give your personal chat Stanford's protections.
+When you ask the chat you are in — Claude Code, on your personal Pro account — to run a job on
+your Stanford Claude or Stanford Codex account, that chat can see the task and the results, and
+handles them under your personal account and its settings. Choosing the Stanford account for the
+job does not give your personal chat Stanford's protections.
 
-Use Bonsai for work you are happy to have in your personal chat anyway. For PHI, PII, student
-records or anything Stanford classes Moderate or High Risk, do not route a job: use Stanford's
-tools directly, as a person — Stanford's Claude or ChatGPT Edu in the browser, or a Terminal
-window you open yourself and sign in to the seat. Bonsai will say this when you add the seats,
-refuse a chat-driven job that declares such data (`--data moderate|high|phi`) before it reads a
-file, and remind you on every chat-driven job to a seat.
+So only route work that is fine in your personal chat anyway; ordinary personal work, a family
+project with names in it, is fine, and you remain responsible for what you share. For protected
+information — confidential student records, research interviews, health records, anything Stanford
+classes Moderate or High Risk — open a tool and account Stanford approves for that information
+yourself, outside the chat, and do not bring the results back into the chat. A Stanford login alone
+is not approval: Stanford's Claude, for example, is not approved for PHI at all (its AI API Gateway
+is). Bonsai does not check your files; it refuses a job that declares `--data moderate|high|phi`
+before it reads a file, and otherwise routes what you give it. It prints this notice before your
+first job, at `install-skill`, and asks you to acknowledge it when you add the Stanford accounts.
+
+**If you let Claude Code do the setup for you from this file:** it must show you this notice in
+its reply before it routes any work. Finishing a browser sign-in does not count as having read it.
 
 (For terminal users there is a weak workaround: `bonsai run --pool stanford -- claude` opens a
-Claude Code session *on* the seat in your Terminal. It protects nothing by itself; it only keeps
-the work in a Stanford-signed session *if you type there yourself*. If a chat launches it, the
-output comes back to the chat.)
+Claude Code session *on* the Stanford account in your Terminal. It protects nothing by itself; it
+only keeps the work in a Stanford-signed session *if you type there yourself*, and it does not make
+that account approved for any particular data. If a chat launches it, the output comes back to the
+chat.)
 
 ## What you end up with
 
@@ -46,10 +52,12 @@ output comes back to the chat.)
 | "my Stanford Claude" | Claude for Education seat | `stanford` (ant) ⌂ | `bonsai login you@stanford.edu --claude --institution` |
 | "my Stanford Codex" / "Stanford ChatGPT" | ChatGPT Edu seat | `stanford` (oai) ⌂ | `bonsai login you@stanford.edu --codex --institution` |
 
-The `⌂` marks an institution seat: `auto` routing uses it only for `--kind sensitive` work and
-never for everyday jobs; a named target (`stanford-codex`) always means that seat. Your personal
-Pro carries everyday work. If you add a personal ChatGPT login later (`codex`, sign in), it joins
-the board as `personal` (oai).
+The `⌂` means "marked institution by you": `auto` routing uses such an account only for
+`--kind sensitive` work and never for everyday jobs; a named target (`stanford-codex`) always
+means that account. The mark does not verify that you picked the Stanford workspace at sign-in
+(check what `bonsai doctor` shows) and does not mean approval for any data. Your personal Pro
+carries everyday work. If you add a personal ChatGPT login later (`codex`, sign in), it joins the
+board as `personal` (oai).
 
 ## The steps
 

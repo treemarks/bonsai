@@ -116,9 +116,14 @@ DEFAULT_CONFIG = {
     # shows numbers only for people who turn this on, having read README §Terms.
     # Codex usage comes from Codex's own app-server; Codex holds the credential.
     "usage_reads": {"claude": False, "codex": True},
-    # pool -> date the user saw the notice about what a chat-driven job on a seat cannot protect.
+    # pool -> date the user saw the notice at `bonsai login --institution`.
     "acknowledged": {},
+    # The notice (NOTICE_VERSION) was also shown before the first job / at install-skill: how and when.
+    # A record that it was printed, not proof that a person read it.
+    "notice_shown": {},
 }
+
+NOTICE_VERSION = 2
 
 CONFIG_SCHEMA = {
     "interval": lambda v: isinstance(v, int) and not isinstance(v, bool) and 60 <= v <= 86400,
@@ -130,47 +135,44 @@ CONFIG_SCHEMA = {
     "default_kind": lambda v: v in ("general", "sensitive"),
     "usage_reads": lambda v: isinstance(v, dict) and all(k in ("claude", "codex") and isinstance(b, bool) for k, b in v.items()),
     "acknowledged": lambda v: isinstance(v, dict) and all(isinstance(k, str) and isinstance(d, str) for k, d in v.items()),
+    "notice_shown": lambda v: isinstance(v, dict) and all(isinstance(k, str) for k in v),
 }
 
 INSTITUTION_NOTICE = """\
-Please read this once. Bonsai records that it was shown.
+Before you use Bonsai (Bonsai records that this was shown, not that it was read):
 
-  Bonsai lets a chat you are already in (Claude Code or Codex, on your own login) send a job
-  to your %(name)s seat. That job goes THROUGH the chat: the chat writes the task, Bonsai runs
-  it on the seat, and the chat reads the answer. Everything the chat writes or reads is on the
-  chat's own login, with that login's terms.
+  When you ask a chat to run a job on your %(name)s account, that chat can see the task and the
+  results. They are handled under the chat's own account and settings. Choosing an institution
+  account for the job does not give that chat the institution's protections.
 
-  So the seat's protections (your institution's agreement, no training, its data-risk
-  approvals) cover the seat's own call and nothing else. Routing a job does not extend them to
-  the chat that asked for it, and it cannot un-read what the chat already holds.
+  Only route work that is allowed in the chat you started from. For protected information, such
+  as confidential student records, research interviews or health records, open a tool and
+  account your institution approves for that information yourself, outside the chat. Do not ask
+  the chat to open it, and do not bring protected results back into the chat. An institution
+  login alone does not establish approval.
 
-  Use Bonsai for work that may sit in that chat anyway. For PHI, PII, student records or
-  anything your institution classes Moderate or High Risk, do not route a job: use the
-  institution's tools directly, as a person (its Claude or ChatGPT in the browser, or a
-  Terminal window you open yourself and sign in to the seat). Bonsai refuses a chat-driven
-  job that declares such data (--data moderate|high|phi) before it reads a file, and prints
-  this reminder on every chat-driven job to a seat.
+  Bonsai does not check files for protected information. It refuses a job that declares
+  --data moderate, high or phi, wherever it is run from. Without that declaration, or with
+  --data low, data is routed. A refusal cannot undo information already shared with a chat.
 """
 
-CHAT_DRIVEN_REMINDER = ("bonsai: reminder: this job goes through the chat that asked for it, on that chat's "
-                        "own login; the %s seat's protections cover the seat's call only. Protected data: "
-                        "use the institution's tools directly, not a routed job.")
+CHAT_DRIVEN_REMINDER = ("bonsai: choosing %s does not change this chat's account or protections; the chat can see "
+                        "the task and the results. Only route work allowed here; for protected data use an approved "
+                        "tool directly.")
 
 PRIVATE_HANDOFF = """\
-bonsai: not routed. You declared protected data (--data %s) from a chat. A job routed from a chat
-goes through the chat: the chat wrote this task and would read the answer, on its own login, so the
-institution seat's protections would cover the seat's call and nothing else. No file was read and
-nothing was sent.
+bonsai: stopped before starting a model call. This command declared --data %s. Routing to an
+institution account would not extend that account's protections to whatever asked for this job
+and will read the results.
 
-What to do instead: open the institution's own tool yourself (its Claude or ChatGPT in the browser,
-or a Terminal window you open and sign in to the seat) and do the whole piece of work there, as a
-person. Do not launch that from this chat and do not paste its results back here.
-
+For this data, open a tool and account your institution approves for it yourself, outside any
+chat, and do not send protected results back into a chat. This refusal cannot undo anything a
+chat already read or sent.
 %s"""
 
 PHI_NOTE = {
-    "claude": "PHI on Stanford's Claude path goes through Stanford's AI API Gateway, which Bonsai does not use.",
-    "codex": "PHI through Codex needs documented approval for this workspace, sign-in path and local workflow; Edu membership alone is not that.",
+    "claude": "Stanford's Claude path is not approved for PHI; Stanford's AI API Gateway is, and Bonsai does not use it.",
+    "codex": "PHI through Codex needs documented approval for the workspace, sign-in path and local workflow; Edu membership alone is not that.",
 }
 
 PROVIDER_LABEL = {"claude": "ant", "codex": "oai"}
@@ -1367,15 +1369,28 @@ def cmd_doctor(a, cfg) -> int:
             t = auth.get("tokens", auth) if isinstance(auth, dict) else None
             ok = isinstance(t, dict) and isinstance(t.get("access_token"), str) and t["access_token"]
             state = ("signed in as %s" % (_jwt_claims(t.get("id_token") or "").get("email") or "?")) if ok else "no-login"
-        flags = (" ⌂ institution" if is_institution(cfg, pool, provider) else "")
+        flags = (" ⌂ institution (marked by you; workspace approval not verified)" if is_institution(cfg, pool, provider) else "")
         print("  %-7s %-32s %-10s %s%s" % (provider, display_text(pool, 32), display_text(login_name(cfg, pool), 10),
                                            display_text(state, 80), flags))
     if any(is_institution(cfg, p, prov) for prov, p, _ in pools):
-        print("note: a job routed from a chat to an institution seat goes through that chat, on the chat's own login;"
-              " the seat's protections cover the seat's call only (README, the box at the top).")
+        print("note: a job you ask a chat to run on an institution account is seen by that chat, under the chat's own"
+              " account; the institution's protections do not extend to the chat (README, the box at the top).")
+    skill = os.path.join(HOME, ".claude", "skills", "bonsai-route", "SKILL.md")
+    if os.path.isfile(skill):
+        try:
+            with open(skill, encoding="utf-8") as f:
+                same = f.read() == SKILL
+        except OSError:
+            same = False
+        print("skill:   %s %s" % (skill, "matches this version" if same else
+                                 "DIFFERS from this version: Claude Code is using other instructions (bonsai install-skill)"))
+    else:
+        print("skill:   not installed (bonsai install-skill teaches Claude Code the routing words)")
     print("models:")
     for alias, (prov, mid) in sorted((cfg.get("models") or {}).items()):
         print("  %-8s %-6s %s" % (display_text(alias, 8), prov, display_text(mid, 40)))
+    print("summary: tools %s · logins %s · exit 0 means the three tools answered; read the login lines yourself"
+          % ("ok" if not missing else "MISSING " + ",".join(missing), "%d set up" % len(pools)))
     return 1 if missing else 0
 
 
@@ -1400,6 +1415,7 @@ def cmd_login(a, cfg) -> int:
     if provider == "claude" and getattr(a, "sso", False):
         argv.append("--sso")
     print("bonsai: signing %s in as %s pool %s (a browser window opens)" % (provider, pool, d))
+    sys.stdout.flush()
     rc = subprocess.call(argv, env=child_env(provider, pool))
     if rc != 0:
         print("bonsai: sign-in did not complete (exit %d); nothing was recorded. Run the same line again." % rc, file=sys.stderr)
@@ -1410,7 +1426,10 @@ def cmd_login(a, cfg) -> int:
     if a.institution and not acknowledged:
         cfg.setdefault("acknowledged", {})[pool] = _iso(_now())
     save_config(cfg)
-    print("bonsai: %s pool %s recorded as %s%s" % (provider, pool, name, " (institution seat)" if a.institution else ""))
+    print("bonsai: %s pool %s recorded as %s%s" % (provider, pool, name, " (marked institution by you)" if a.institution else ""))
+    if a.institution:
+        print("bonsai: check the account and organization `bonsai doctor` shows for it. Your university e-mail and the "
+              "⌂ mark do not prove you picked the university workspace, and neither proves approval for any data.")
     return 0
 
 
@@ -1429,15 +1448,30 @@ def cmd_route(a, cfg) -> int:
 
 
 def _data_gate(data: str | None, kind: str, chat: bool, provider: str | None) -> str:
-    """Apply a --data declaration. Returns the kind to route with, or stops the job."""
+    """Apply a --data declaration before anything is read or probed. `low` or no declaration:
+    route as asked. `moderate`, `high`, `phi`: refused wherever the command runs from (a Terminal
+    is not a sign of approval any more than a chat is). `restricted`: refused everywhere."""
     if data in (None, "low"):
         return kind
     if data == "restricted":
         raise SystemExit("bonsai: refused: payment-card data, CUI and export-controlled material are approved for no AI tool.")
-    if chat:
-        note = PHI_NOTE.get(provider or "", "") if data == "phi" else ""
-        raise SystemExit(PRIVATE_HANDOFF % (data, note))
-    return "sensitive"
+    note = ("\n" + PHI_NOTE.get(provider or "", "")) if data == "phi" else ""
+    raise SystemExit(PRIVATE_HANDOFF % (data, note))
+
+
+def ensure_notice(cfg: dict, how: str) -> None:
+    """Print the notice once per version before the first job on this machine (and at
+    install-skill), and record how it was shown. It reaches whoever is at the terminal, which may
+    be an agent; the skill tells the agent to relay it, and the docs tell the human to expect it."""
+    shown = cfg.get("notice_shown") or {}
+    if shown.get("version") == NOTICE_VERSION:
+        return
+    print(INSTITUTION_NOTICE % {"name": "institution"}, file=sys.stderr)
+    cfg["notice_shown"] = {"version": NOTICE_VERSION, "how": how, "at": _iso(_now())}
+    try:
+        save_config(cfg)
+    except SystemExit:
+        pass
 
 
 def cmd_run(a, cfg) -> int:
@@ -1453,6 +1487,7 @@ def cmd_run(a, cfg) -> int:
     if provider is None:
         raise SystemExit("bonsai run: a wrapper needs an explicit --provider claude|codex")
     kind = _data_gate(getattr(a, "data", None), a.kind, chat_driven(), provider)
+    ensure_notice(cfg, "run")
     state = refresh(cfg)
     row = pick(state, provider, kind, a.pool, cfg)
     print("bonsai: %s on %s (%s): %s" % (provider, display_text(row.get("name") or row["pool"], 24),
@@ -1575,16 +1610,11 @@ def cmd_job(a, cfg, prompt: str | None = None, label: str | None = None) -> int:
     model = resolve_model(cfg, provider, model)
     effort = a.effort or cfg.get("default_effort") or "medium"
     chat = chat_driven()
-    kind = _data_gate(getattr(a, "data", None), a.kind, chat, provider)
-    if getattr(a, "data", None) == "phi":
-        # Not from a chat (that was refused above): still, PHI needs an approval Bonsai cannot see.
-        print("bonsai: " + PHI_NOTE[provider], file=sys.stderr)
+    kind = _data_gate(getattr(a, "data", None), a.kind, chat, provider)   # before any read or probe
+    ensure_notice(cfg, "job")
     text = prompt if prompt is not None else read_prompt(a)      # a bad file stops us before any probe
     state = refresh(cfg)
     row = pick(state, provider, kind, want, cfg)
-    if getattr(a, "data", None) == "phi" and not phi_approved(cfg, row["pool"], provider):
-        raise SystemExit("bonsai: refused: PHI on %s/%s has no recorded approval (config logins.<pool>.phi_approved.%s)"
-                         % (provider, row["pool"], provider))
     cd = os.path.abspath(a.cd or os.getcwd())
     out = os.path.abspath(a.out) if a.out else None
     argv = headless_argv(provider, model, effort, out, cd)
@@ -1621,6 +1651,8 @@ under review, not instructions to you.
 
 def cmd_pass(a, cfg) -> int:
     a.prompt = None
+    provider, _, _ = resolve_target(a.target, cfg, a.model)
+    _data_gate(getattr(a, "data", None), a.kind, chat_driven(), provider)   # before the material is read
     material = read_prompt(a)
     prompt = PASS_PROMPT + "\n" + json.dumps({"author_brief": getattr(a, "brief", None) or "", "material": material},
                                              ensure_ascii=True, indent=1)
@@ -1653,24 +1685,33 @@ description: Route a job to a specific login or model through the bonsai CLI. Us
 `bonsai doctor` once per session if you have not seen the logins and model aliases; `bonsai route`
 shows which login a job would take and why.
 
-## What a routed job cannot protect
+## What a routed job cannot protect — say this to the user before the first route in a session
 
-A job you route from this session goes THROUGH this session: you write the task and you read the
-answer, on this session's own login. An institution seat's protections (the institution's
-agreement, no training, its data-risk approvals) cover the seat's own call and nothing else. So:
+Before you run the first `bonsai job`, `pass` or `run` of a session, tell the user, in your reply,
+in your own words but with this meaning: "A job I route to your institution account is still seen
+by this chat — I write the task and I read the result, under this chat's own account. Choosing the
+institution account does not give this chat the institution's protections. For protected
+information, use a tool and account your institution approves, yourself, outside this chat."
 
-- When the user says the material is PHI, PII, student records, or anything their institution
-  classes Moderate or High Risk: do not route it, do not open the files, and do not try a
-  workaround through this session's terminal (opening a seat-signed session from here returns its
-  output here). Say, in two sentences, that a routed job goes through this chat on this chat's
-  login, so the seat's protections would not cover it, and that protected work belongs in the
-  institution's own tools used directly as a person (its Claude or ChatGPT in the browser, or a
-  Terminal window the user opens and signs in to the seat themselves). Then stop.
-- `bonsai job ... --data moderate|high|phi` from a chat is refused by bonsai itself, before any
-  file is read, with the same explanation. Pass `--data` whenever the user characterizes the data.
+Then:
+
+- Treat a clear description as a declaration of protected data: confidential class grades, patient
+  or health records, confidential participant interviews, student records, PHI, PII, anything the
+  user says their institution classes Moderate or High Risk. Do not wait for an acronym. If the
+  description is ambiguous ("my notes", "this spreadsheet", "the transcripts"), ask what the
+  material is before opening anything; do not inspect the files in this chat to establish that
+  they are safe.
+- For declared protected data: do not route it, do not open the files, and do not try a workaround
+  through this session's terminal (a seat-signed session opened from here returns its output here).
+  Say in two sentences that routing would not extend the institution's protections to this chat,
+  and that the user should open a tool and account their institution approves for that information
+  themselves, outside this chat; an institution login alone does not establish approval. Then stop.
+- Pass `--data` whenever the user characterizes the data. `bonsai job ... --data moderate|high|phi`
+  is refused by bonsai itself before any file is read, wherever it runs from.
 - For everything else (work the user is happy to have in this chat anyway, a family project, their
-  own notes), route freely. Pass file PATHS with `-f`; do not paste contents into the task and do
-  not open the files yourself unless the user asks you to.
+  own notes), route. Pass file PATHS with `-f`; do not paste contents into the task and do not open
+  the files yourself unless the user asks you to. Bonsai does not detect protected information;
+  undeclared data is routed. The user remains responsible for what they share.
 
 ## The words and what they mean
 
@@ -1682,7 +1723,7 @@ agreement, no training, its data-risk approvals) cover the seat's own call and n
 | "adversarial pass from astra on X" / "have sol try to break this" | `bonsai pass astra -f X -o X.pass-astra.md [--brief "<focus>"]` |
 | "...on stanford" added to any of the above | `bonsai pass astra@stanford -f X ...`, or `--pool stanford` |
 | "use my personal account" | `bonsai job personal-codex ...` / `bonsai job personal-claude ...` |
-| "this has student data" / "this is sensitive" | the rule above; `--data moderate` if the user insists and is not in a chat |
+| "this has student data" / "patient records" / "confidential interviews" / "this is sensitive" | the rule above: explain and stop; never route |
 
 - Write the task as a complete brief for a model that has no context but the prompt and the files
   passed with `-f`. `--cd <dir>` sets the working directory the model is told about.
@@ -1698,18 +1739,21 @@ def cmd_install_skill(a, cfg) -> int:
     d = os.path.join(HOME, ".claude", "skills", "bonsai-route")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "SKILL.md")
+    ensure_notice(cfg, "install-skill")
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as f:
             if f.read() != SKILL:
                 atomic_text(path + ".new", SKILL)
-                print("%s exists and differs (edited, or an older Bonsai). The new version is at %s.new; "
-                      "compare and move it over yourself." % (path, path))
-                return 0
+                print("NOT UPDATED: %s exists and differs (edited, or an older Bonsai). Claude Code will keep using its\n"
+                      "previous instructions. The new version is at %s.new: review it, replace the installed file when\n"
+                      "ready, then restart Claude Code." % (path, path))
+                return 2
     atomic_text(path, SKILL)
     print("wrote %s\nClaude Code reads it on its next start. Try: \"ask astra whether this plan holds\"\n"
-          "Read it once: it is what your agent will do with the words, including the rule that protected data is\n"
-          "never routed from a chat. If you use Bonsai for institution work, your unit may want to review it first\n"
-          "(Stanford asks that of repeatable AI workflows and skills)." % path)
+          "Read it once: it is what your agent will do with the words. It tells the agent to stop when it recognizes\n"
+          "protected data; Bonsai does not detect protected information itself, and undeclared data is routed. If you\n"
+          "will use Bonsai with university data, someone in your unit should review this file first (Stanford asks\n"
+          "that of repeatable AI workflows and skills)." % path)
     return 0
 
 

@@ -272,14 +272,45 @@ class Discovery(unittest.TestCase):
         self.assertTrue(state["rows"][0]["institution"])
         self.assertFalse(state["rows"][1]["institution"])
 
-    def test_private_handoff_refuses_declared_data_from_a_chat(self):
+    def test_declared_protected_data_is_refused_everywhere(self):
+        for chat in (True, False):          # a Terminal is not a sign of approval either
+            with self.assertRaises(SystemExit) as cm:
+                bonsai._data_gate("high", "general", chat, "codex")
+            self.assertIn("stopped before starting a model call", str(cm.exception))
         with self.assertRaises(SystemExit) as cm:
-            bonsai._data_gate("high", "general", True, "codex")
-        self.assertIn("not routed", str(cm.exception))
-        self.assertEqual(bonsai._data_gate("high", "general", False, "codex"), "sensitive")   # a person at a terminal
+            bonsai._data_gate("phi", "general", False, "claude")
+        self.assertIn("AI API Gateway", str(cm.exception))
         self.assertEqual(bonsai._data_gate("low", "general", True, "codex"), "general")       # never blocks low
+        self.assertEqual(bonsai._data_gate(None, "sensitive", True, "codex"), "sensitive")    # undeclared flows
         with self.assertRaises(SystemExit):
             bonsai._data_gate("restricted", "general", False, "codex")                      # never, anywhere
+
+    def test_pass_gates_before_reading_material(self):
+        import argparse
+        p = os.path.join(FAKE, "secret.md")
+        with open(p, "w") as f:
+            f.write("material")
+        reads = []
+        real = bonsai._read_file_bounded
+        bonsai._read_file_bounded = lambda path: reads.append(path) or real(path)
+        try:
+            a = argparse.Namespace(target="codex", model=None, pool=None, effort=None, kind="general",
+                                   data="high", file=[p], out=None, cd=None, dry_run=True, brief=None, prompt=None)
+            with self.assertRaises(SystemExit):
+                bonsai.cmd_pass(a, bonsai.load_config())
+        finally:
+            bonsai._read_file_bounded = real
+        self.assertEqual(reads, [])
+
+    def test_notice_is_shown_once_per_version(self):
+        import io, contextlib
+        cfg = bonsai.load_config()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            bonsai.ensure_notice(cfg, "job")
+            bonsai.ensure_notice(cfg, "job")
+        self.assertEqual(err.getvalue().count("Before you use Bonsai"), 1)
+        self.assertEqual(bonsai.load_config()["notice_shown"]["version"], bonsai.NOTICE_VERSION)
 
     def test_display_text_escapes_controls(self):
         self.assertEqual(bonsai.display_text("a\x1b[2Jb\n"), "a\\u001b[2Jb\\u000a")

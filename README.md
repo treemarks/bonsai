@@ -19,18 +19,20 @@ personal account. Bonsai lets several sign-ins live on one Mac and work together
 Bonsai is the one-machine version of the pool router that schedules [Treemarks](https://treemarks.ai)'
 grading fleet. Same board, same routing rule, no fleet.
 
-> **The one thing to know.** A job you route from a chat (Claude Code or Codex, on your own
-> login) to an institution seat goes *through* that chat: the chat writes the task, Bonsai runs it
-> on the seat, and the chat reads the answer, all on the chat's own login. The seat's protections
-> (your institution's agreement, no training, its data-risk approvals) cover the seat's own call
-> and nothing else; routing does not extend them to the chat that asked. So Bonsai is for work
-> that may sit in that chat anyway — a family project with names in it is yours to put where you
-> like. For PHI, PII, student records or anything your institution classes Moderate or High Risk,
-> don't route a job: use the institution's own tools directly, as a person (its Claude or ChatGPT
-> in the browser, or a Terminal window you open yourself and sign in to the seat). Bonsai says this
-> once when you add an institution seat, refuses a chat-driven job that declares such data
-> (`--data moderate|high|phi`) before it reads a file, and prints a reminder on every chat-driven
-> job to a seat.
+> **The one thing to know.** When you ask a chat (Claude Code or Codex, on your own account) to
+> run a job on your institution account, that chat can see the task and the results, and handles
+> them under its own account and settings. Choosing the institution account for the job does not
+> give the chat the institution's protections. So only route work that is allowed in the chat you
+> started from: Bonsai allows ordinary personal work, including a family project with names in it,
+> and you remain responsible for what you share. For protected information — confidential student
+> records, research interviews, health records, anything your institution classes Moderate or High
+> Risk — open a tool and account your institution approves for that information yourself, outside
+> the chat; an institution login alone does not establish approval (at Stanford, for example,
+> Claude is not approved for PHI at all; the AI API Gateway is). Bonsai does not check files for
+> protected information: it refuses a job that declares `--data moderate|high|phi` before it reads a
+> file, wherever it is run from; undeclared data is routed. It prints this notice before your first
+> job, at `install-skill`, and when you add an institution account, and a one-line reminder on every
+> chat-driven job to one.
 
 Bonsai is an independent Treemarks project. It is not endorsed by Stanford, Anthropic or OpenAI;
 Stanford appears here as an example institutional configuration, with links to its public pages.
@@ -65,14 +67,20 @@ bonsai login you@stanford.edu --claude --institution    # opens the Claude sign-
 bonsai login you@stanford.edu --codex  --institution    # opens the ChatGPT sign-in; pick the Stanford workspace
 ```
 
-The first `--institution` prints the notice above and asks you to type `I understand`; the date
-is recorded. Each login lands in `~/.claude-pools/you@stanford.edu` or
+The first `--institution` prints the notice above and, in a Terminal, asks you to type
+`I understand` (typed into that Terminal window, then Return); the date is recorded. If an agent
+runs the setup for you, the notice reaches the agent's output, not your eyes: the skill tells the
+agent to relay it before its first route, and HANDOFF.md tells you to expect that. Each login lands
+in `~/.claude-pools/you@stanford.edu` or
 `~/.codex-pools/you@stanford.edu`, the directories the CLIs call `CLAUDE_CONFIG_DIR` and
 `CODEX_HOME`. Nothing is copied between pools; Claude's credential stays in your login Keychain,
 Codex's in its own `auth.json`, exactly where the CLIs put them. The institution flag is recorded
 per provider, when that sign-in completes; it is your declaration (Bonsai cannot read your
 institution's contracts), and it marks the seat `⌂` on the board so that `auto` routing uses it
-only for `--kind sensitive` work and never for everyday jobs. `--name <label>` changes the label
+only for `--kind sensitive` work and never for everyday jobs. `⌂` means "marked institution by
+you": a successful sign-in does not verify that you picked the university workspace, and neither
+proves approval for any data; check the account and organization `bonsai doctor` shows. `--name
+<label>` changes the label
 (default `stanford` for a stanford.edu address, else the domain). A second personal login is
 `bonsai login other@gmail.com --claude` with no flag.
 
@@ -123,8 +131,9 @@ Two kinds of work, two orders:
   whose usage could not be read is not ranked. An institution seat never carries general work by
   `auto`; name it if you mean it.
 - **sensitive** — institution seats only, never a personal login, even a named one. Read the box
-  at the top first: `sensitive` keeps the *job* off personal logins; it does not keep the material
-  out of the chat that sent it, which is why `--data moderate|high|phi` from a chat is refused.
+  at the top first: `sensitive` is about *purpose* (university work goes to the university
+  account); it keeps the job off personal logins and does nothing about what the chat that sent
+  it can see, which is why declared protected data (`--data moderate|high|phi`) is refused.
 
 A **named** target (`stanford-codex`) means that seat, for general work. When every eligible login
 is held, Bonsai stops and says when the soonest window resets; it never moves a job to another
@@ -155,11 +164,10 @@ Targets: `claude` / `codex` (auto login), `<login>-claude` / `<login>-codex` (`s
 each, 1.6 MB in all). `-o` writes the model's final message to a file, atomically, and leaves the
 old file alone if the job fails. `--cd` sets the working directory the model is told about.
 `--data low|moderate|high|phi|restricted` says what the material is: `moderate`, `high` and `phi`
-from a chat are refused before any file is read; `restricted` (payment-card data, CUI,
-export-controlled material: approved for no AI tool) is refused everywhere; `phi` also needs a
-recorded approval for that seat (`logins.<pool>.phi_approved.<provider>`), and on Stanford's
-Claude path PHI goes through Stanford's AI API Gateway, which Bonsai does not use. `--dry-run`
-prints the command and spends nothing.
+are refused before any file is read, wherever the command runs from (a Terminal is no more a sign
+of approval than a chat is; the refusal says what to do instead); `restricted` (payment-card data,
+CUI, export-controlled material: approved for no AI tool) is refused everywhere; `low` and no
+declaration route. `--dry-run` prints the command and spends nothing.
 
 **What a job can do on your machine.** A Codex job runs `codex exec` in Codex's read-only
 sandbox, signed in with ChatGPT (`forced_login_method="chatgpt"`, never an API key). A Claude job
@@ -201,19 +209,24 @@ the output comes back to the chat.
 bonsai install-skill
 ```
 
-This writes `~/.claude/skills/bonsai-route/SKILL.md` (and never overwrites an edited one; a new
-version goes beside it as `SKILL.md.new`). From then on, in any Claude Code session:
+This prints the notice, then writes `~/.claude/skills/bonsai-route/SKILL.md`. It never overwrites
+an edited one: then it says **NOT UPDATED**, exits 2, and leaves the new version beside it as
+`SKILL.md.new` for you to review and move over (`bonsai doctor` says whether the installed skill
+matches this version). From then on, in any Claude Code session:
 
 > route this to my stanford codex · ask astra whether the proof holds · call an adversarial pass
 > from sol on this draft · use my personal account
 
 ...and Claude Code runs the matching `bonsai` command, writes the result to a file beside the
-material, and reads it back to you. The skill carries the rule from the box at the top: told the
-material is protected, it does not route, does not open the files, and says in two sentences to
-use the institution's tools directly. Read the file once — it is what your agent will do with the
-words — and if you use Bonsai for institution work, your unit may want to review it first: Stanford
-asks that of repeatable AI workflows and skills. Codex users: the same table works as a section of
-your `AGENTS.md`, with the same caveat.
+material, and reads it back to you. The skill carries the rule from the box at the top: before its
+first route in a session it tells you, in its reply, that a routed job is still seen by the chat;
+told the material is protected (it treats "class grades", "patient records", "confidential
+interviews" as that, and asks when a description is ambiguous), it does not route, does not open
+the files, and says to use an approved tool and account yourself. It does not detect protected
+information; undeclared data is routed. Read the file once — it is what your agent will do with the
+words — and if you will use Bonsai with university data, someone in your unit should review it
+first: Stanford asks that of repeatable AI workflows and skills. Codex users: the same table works
+as a section of your `AGENTS.md`, with the same caveat.
 
 ## What Bonsai reads, and what it never does
 
