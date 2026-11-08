@@ -45,6 +45,7 @@ import math
 import os
 import platform
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -72,7 +73,7 @@ MIN_USABLE_PCT = 10.0        # under this much room a login is held, not routed 
 DEFAULT_INTERVAL = 300       # seconds between probes; the floor is 180
 FILE_LIMIT = 400_000         # bytes of one -f file that go into a prompt
 PROMPT_LIMIT = 1_600_000     # bytes of the whole prompt
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 USER_AGENT = "bonsai/%s (+https://github.com/treemarks/bonsai)" % VERSION
 
 # How to get each tool on a machine that has nothing. `bonsai doctor` prints the line for
@@ -395,7 +396,15 @@ def check_pool_name(pool: str) -> str:
             or any(ord(c) < 32 or ord(c) == 127 for c in pool)
             or (IS_WIN and any(c in pool for c in ':*?"<>|'))):
         raise SystemExit("bonsai: a pool is named by its e-mail address (one plain directory name)")
+    if pool.casefold() in RESERVED_NAMES:
+        raise SystemExit("bonsai: %r is a routing word, not a pool name; pick another --pool/--name" % pool)
     return pool
+
+
+# Words the target grammar owns; a pool or label may not take them (`auto`, the provider words,
+# the default model aliases), or `stanford-codex` and `--pool auto` would stop meaning what they say.
+RESERVED_NAMES = frozenset({"auto", "claude", "anthropic", "codex", "openai", "chatgpt", "gpt",
+                            "astra", "sol", "opus", "sonnet", "haiku", "default-claude", "default-codex"})
 
 
 def pool_dir(provider: str, pool: str) -> str:
@@ -724,6 +733,19 @@ def codex_app_server(pool: str, method: str, params: dict | None = None, timeout
             pass
 
 
+def codex_identity(tokens: dict) -> dict:
+    """Labels from a Codex auth.json `tokens` block: e-mail, plan type and a short workspace id
+    (the tail of the ChatGPT account id). Decoded locally, displayed, compared with what the user
+    asked for; never sent anywhere."""
+    claims = _jwt_claims(tokens.get("id_token") or "") if isinstance(tokens, dict) else {}
+    auth = claims.get("https://api.openai.com/auth") if isinstance(claims.get("https://api.openai.com/auth"), dict) else {}
+    acct = tokens.get("account_id") if isinstance(tokens, dict) else None
+    acct = acct if isinstance(acct, str) and acct else (auth.get("chatgpt_account_id") if isinstance(auth.get("chatgpt_account_id"), str) else None)
+    return {"email": claims.get("email") if isinstance(claims.get("email"), str) else None,
+            "plan": auth.get("chatgpt_plan_type") if isinstance(auth.get("chatgpt_plan_type"), str) else None,
+            "workspace": ("…" + acct[-4:]) if acct and len(acct) >= 4 else None}
+
+
 def probe_codex(pool: str, cfg_dir: str, cfg: dict | None = None) -> dict:
     row = {"pool": pool, "provider": "codex", "state": "no-login"}
     try:
@@ -735,8 +757,14 @@ def probe_codex(pool: str, cfg_dir: str, cfg: dict | None = None) -> dict:
         if not isinstance(t, dict) or not isinstance(t.get("access_token"), str) or not t["access_token"]:
             row["state"] = "bad-credfile"
             return row
-        # Identity only, from the id token's e-mail claim (a label, never used for anything else).
-        row["account"] = _jwt_claims(t.get("id_token") or "").get("email")
+        # Identity only, from the id token's claims (labels, never used for anything else): the
+        # e-mail, the plan (`edu_pro`, `plus`, ...), and the last four characters of the ChatGPT
+        # account id, which is the workspace: two pools signed into one workspace show one id.
+        ident = codex_identity(t)
+        row["account"] = ident.get("email")
+        row["workspace"] = ident.get("workspace")
+        if ident.get("plan"):
+            row["plan"] = ident["plan"]
         if not cfg_flag(cfg, "usage_reads", "codex"):
             row["state"] = "signed-in"
             return row
@@ -854,14 +882,19 @@ def route(state: dict, provider: str, kind: str = "general") -> list[dict]:
 
 
 def pick(state: dict, provider: str, kind: str, want: str | None, cfg: dict) -> dict:
-    """Resolve `want` (None/auto, a login name like `stanford`, an e-mail or its prefix) to a row."""
+    """Resolve `want` (None/auto, a login's label like `stanford`, its pool name, or its account
+    e-mail; exact matches only) to a row."""
     rows = [r for r in state.get("rows", []) if r.get("provider") == provider]
     if want and want not in ("auto", ""):
-        w = want.lower()
-        hits = [r for r in rows if r.get("pool", "").lower() == w or (r.get("name") or "").lower() == w
-                or r.get("pool", "").lower().startswith(w) or (r.get("account") or "").lower().startswith(w)]
+        # Exact pool or name first; then the exact account e-mail. No prefixes: `stanford` must
+        # not drift to `stanford-pro` because a second pool appeared (Astra, sign-in pass).
+        w = want.casefold()
+        hits = [r for r in rows if r.get("pool", "").casefold() == w or (r.get("name") or "").casefold() == w]
         if not hits:
-            raise SystemExit("bonsai: no %s login called %r is set up here; `bonsai doctor` lists them" % (provider, want))
+            hits = [r for r in rows if (r.get("account") or "").casefold() == w]
+        if not hits:
+            raise SystemExit("bonsai: no %s login called %r is set up here; `bonsai doctor` lists them "
+                             "(use the full pool name or label; prefixes are not matched)" % (provider, want))
         if len(hits) > 1:
             raise SystemExit("bonsai: %r matches several %s logins: %s" % (want, provider, ", ".join(sorted(r["pool"] for r in hits))))
         r = hits[0]
@@ -902,7 +935,11 @@ KEEP_ENV = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TMP", "TEMP",
             "LC_CTYPE", "TERM", "COLORTERM", "TZ", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT",
             "USERPROFILE", "APPDATA", "LOCALAPPDATA", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME",
             "XDG_STATE_HOME", "XDG_DATA_HOME", "SSH_AUTH_SOCK", "NO_PROXY", "HTTP_PROXY", "HTTPS_PROXY",
-            "no_proxy", "http_proxy", "https_proxy", "__CF_USER_TEXT_ENCODING"}
+            "no_proxy", "http_proxy", "https_proxy", "__CF_USER_TEXT_ENCODING",
+            # CA bundles an IT department hands out for TLS-inspecting networks: not credentials,
+            # and the CLIs need them to reach their own hosts.
+            "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS", "CODEX_CA_CERTIFICATE",
+            "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"}
 
 
 def child_env(provider: str, pool: str) -> dict:
@@ -1207,8 +1244,8 @@ def render(state: dict, cfg: dict, p: Paint, width: int, interval: int) -> str:
     right = p.dim("as of %s ago   refresh in %s" % (_age(age), _age(max(0, interval - age))))
     pad = max(1, width - _vis(head) - _vis(right))
     lines.append(head + " " * pad + right)
-    bw = max(8, min(24, width - 70))
-    lines.append(p.dim("  %-11s %-3s %s %-5s %-7s %-5s %-7s %-8s %s" % (
+    bw = max(8, min(24, width - 74))
+    lines.append(p.dim("  %-15s %-3s %s %-5s %-7s %-5s %-7s %-8s %s" % (
         "LOGIN", "VIA", " " * bw, "%LEFT", "RESET", "5H", "RESET", "PLAN", "STATE")))
     if not rows:
         lines.append("  " + p.dim("no logins set up: `bonsai login <email> --claude` or `--codex`"))
@@ -1216,7 +1253,7 @@ def render(state: dict, cfg: dict, p: Paint, width: int, interval: int) -> str:
         q = r if r.get("state") in ("OK", "LIMITED") else (r.get("last_good") or {})
         wk_left = (100.0 - q["wk"]) if isinstance(q.get("wk"), (int, float)) else None
         fh_left = (100.0 - q["5h"]) if isinstance(q.get("5h"), (int, float)) else None
-        name = ("⌂" if r.get("institution") else " ") + display_text(r.get("name") or r.get("pool", "?"), 10)
+        name = ("⌂" if r.get("institution") else " ") + display_text(r.get("name") or r.get("pool", "?"), 14)
         via = PROVIDER_LABEL.get(r.get("provider"), display_text(r.get("provider"), 3))
         state_s = display_text(r.get("state", "?"), 16)
         if state_s == "OK":
@@ -1229,7 +1266,7 @@ def render(state: dict, cfg: dict, p: Paint, width: int, interval: int) -> str:
             state_s = p.red(state_s)
         wk_reset = _age(q["wk_at"] - _now()) if isinstance(q.get("wk_at"), (int, float)) else "·"
         fh_reset = _age(q["5h_at"] - _now()) if isinstance(q.get("5h_at"), (int, float)) else "·"
-        lines.append("  %-11s %-3s %s %s %-7s %s %-7s %-8s %s" % (
+        lines.append("  %-15s %-3s %s %s %-7s %s %-7s %-8s %s" % (
             name, via, level_color(p, wk_left, bar(wk_left, bw)),
             _fixw(level_color(p, wk_left, "%.0f%%" % wk_left) if wk_left is not None else "·", 5),
             wk_reset,
@@ -1357,9 +1394,11 @@ def cmd_doctor(a, cfg) -> int:
         print("  config  has unknown or malformed keys: %s" % ", ".join(sorted(bad)))
     print("logins:")
     pools = discover_pools()
+    signed_in = 0
     if not pools:
         print("  none yet. `bonsai login <email> --claude` or `bonsai login <email> --codex`.")
     for provider, pool, d in pools:
+        st = None
         if provider == "claude":
             st = claude_status(pool)
             state = ("cli-missing" if st is None and not shutil.which("claude") else "unknown" if st is None
@@ -1369,17 +1408,26 @@ def cmd_doctor(a, cfg) -> int:
             auth = _read_json(os.path.join(d, "auth.json"), None)
             t = auth.get("tokens", auth) if isinstance(auth, dict) else None
             ok = isinstance(t, dict) and isinstance(t.get("access_token"), str) and t["access_token"]
-            state = ("signed in as %s" % (_jwt_claims(t.get("id_token") or "").get("email") or "?")) if ok else "no-login"
+            state = ("signed in as %s" % describe_identity(codex_identity(t))) if ok else "no-login"
+            if ok:
+                signed_in += 1
+        if provider == "claude" and st and st.get("loggedIn"):
+            signed_in += 1
         flags = (" ⌂ institution (marked by you; workspace approval not verified)" if is_institution(cfg, pool, provider) else "")
         print("  %-7s %-32s %-10s %s%s" % (provider, display_text(pool, 32), display_text(login_name(cfg, pool), 10),
                                            display_text(state, 80), flags))
     if any(is_institution(cfg, p, prov) for prov, p, _ in pools):
         print("note: a job you ask a chat to run on an institution account is seen by that chat, under the chat's own"
               " account; the institution's protections do not extend to the chat (README, the box at the top).")
-    else:
-        print("no institution account yet. If you have one, SETUP.md §5c-5d signs it in; if not, here is where it comes from:")
-        for line in signup_hints():
-            print("  " + line)
+    for prov in ("claude", "codex"):
+        if not any(is_institution(cfg, p, pv) for pv, p, _ in pools if pv == prov):
+            print("no institution login is recorded for %s here. If you already have the account, SETUP.md §5%s signs "
+                  "it in; if not, this is where it comes from (request it yourself; Bonsai never requests or buys):"
+                  % (prov, "c" if prov == "claude" else "d"))
+            for line in signup_hints(provider=prov):
+                print("  " + line)
+    print("network: download and sign-in connectivity are not tested here; if an install, update or sign-in failed, "
+          "that command's own error is the diagnosis, and a green tools line does not clear it.")
     skill = os.path.join(HOME, ".claude", "skills", "bonsai-route", "SKILL.md")
     if os.path.isfile(skill):
         try:
@@ -1394,8 +1442,8 @@ def cmd_doctor(a, cfg) -> int:
     print("models:")
     for alias, (prov, mid) in sorted((cfg.get("models") or {}).items()):
         print("  %-8s %-6s %s" % (display_text(alias, 8), prov, display_text(mid, 40)))
-    print("summary: tools %s · logins %s · exit 0 means the three tools answered; read the login lines yourself"
-          % ("ok" if not missing else "MISSING " + ",".join(missing), "%d set up" % len(pools)))
+    print("summary: tools %s · pools %d, signed in %d · exit 0 means the three tools answered; read the login lines yourself"
+          % ("ok" if not missing else "MISSING " + ",".join(missing), len(pools), signed_in))
     return 1 if missing else 0
 
 
@@ -1409,9 +1457,20 @@ def cmd_login(a, cfg) -> int:
     pool = check_pool_name(getattr(a, "pool", None) or a.email)
     if pool == "default":
         raise SystemExit("bonsai: `default` is the CLI's own sign-in; run `%s` itself to sign that in" % provider)
+    name = a.name or login_name(cfg, pool)
+    if a.name:
+        check_pool_name(a.name)  # a label obeys the same rules as a pool name (no routing words)
+
+    def taken(label):
+        return [other for other, entry in (cfg.get("logins") or {}).items() if other != pool and
+                (other.casefold() == label.casefold() or (entry.get("name") or "").casefold() == label.casefold())]
+    if taken(name):
+        if a.name:
+            raise SystemExit("bonsai: the label %r already names the pool %s; give this sign-in its own --name"
+                             % (name, taken(name)[0]))
+        name = pool  # two logins at one domain: the second is labelled by its full address, never ambiguous
     d = pool_dir(provider, pool)
     private_dir(d)
-    name = a.name or login_name(cfg, pool)
     acknowledged = bool(cfg.get("acknowledged"))  # once per machine, not per login
     if a.institution and not acknowledged:
         print(INSTITUTION_NOTICE % {"name": name})
@@ -1421,12 +1480,23 @@ def cmd_login(a, cfg) -> int:
     argv = [tool, "auth", "login", "--email", a.email] if provider == "claude" else [tool, "login"]
     if provider == "claude" and getattr(a, "sso", False):
         argv.append("--sso")
-    print("bonsai: signing %s in as %s pool %s (a browser window opens)" % (provider, pool, d))
+    if provider == "codex" and getattr(a, "device_auth", False):
+        argv.append("--device-auth")
+    print("bonsai: signing %s in as %s pool %s (a browser window opens; check the e-mail and, for ChatGPT, "
+          "the workspace the page shows before you approve)" % (provider, pool, d))
     sys.stdout.flush()
     rc = subprocess.call(argv, env=child_env(provider, pool))
     if rc != 0:
-        print("bonsai: sign-in did not complete (exit %d); nothing was recorded. Run the same line again." % rc, file=sys.stderr)
+        print("bonsai: sign-in did not complete (exit %d). Bonsai did not record this login. The pool folder and any "
+              "earlier sign-in in it may still exist; do not run jobs on this pool until `bonsai doctor` shows the "
+              "account you meant. Run the same line again when ready." % rc, file=sys.stderr)
         return rc
+    found = login_identity(provider, pool, d)
+    if found.get("email") and found["email"].casefold() != a.email.casefold():
+        print("bonsai: the %s sign-in that completed is %s, not %s. Nothing was recorded. The browser signed in "
+              "another account (one it was already signed in to, perhaps). Sign that pool out and try again in a "
+              "private window:\n  %s" % (provider, found["email"], a.email, logout_line(provider, pool)), file=sys.stderr)
+        return 1
     entry = cfg.setdefault("logins", {}).setdefault(pool, {})
     entry["name"] = name
     entry.setdefault("institutions", {})[provider] = bool(a.institution)
@@ -1436,11 +1506,52 @@ def cmd_login(a, cfg) -> int:
         # Acknowledged is shown: the first job and install-skill do not print the notice again.
         cfg["notice_shown"] = {"version": NOTICE_VERSION, "how": "login", "at": now}
     save_config(cfg)
+    try:
+        os.remove(cache_path())  # the board re-probes: a row for this pool must not stay stale for an interval
+    except OSError:
+        pass
     print("bonsai: %s pool %s recorded as %s%s" % (provider, pool, name, " (marked institution by you)" if a.institution else ""))
+    print("bonsai: signed in as %s" % describe_identity(found))
     if a.institution:
-        print("bonsai: check the account and organization `bonsai doctor` shows for it. Your university e-mail and the "
-              "⌂ mark do not prove you picked the university workspace, and neither proves approval for any data.")
+        if provider == "codex":
+            print("bonsai: the workspace is shown as a plan type and a short id (two pools with one id are the same "
+                  "workspace). Confirm it is the workspace you chose in the browser; Bonsai cannot name it. Your "
+                  "university e-mail and the ⌂ mark do not prove the workspace, and neither proves approval for any data.")
+        else:
+            print("bonsai: check the organization shown is your university's. The e-mail and the ⌂ mark do not prove "
+                  "it, and neither proves approval for any data.")
     return 0
+
+
+def login_identity(provider: str, pool: str, d: str) -> dict:
+    """What the CLI says is signed in to this pool, as labels: e-mail, org/plan, workspace id."""
+    if provider == "claude":
+        st = claude_status(pool) or {}
+        if not st.get("loggedIn"):
+            return {}
+        return {"email": st.get("email"), "org": st.get("orgName"), "plan": st.get("subscriptionType")}
+    auth = _read_json(os.path.join(d, "auth.json"), None)
+    t = auth.get("tokens", auth) if isinstance(auth, dict) else None
+    return codex_identity(t) if isinstance(t, dict) else {}
+
+
+def describe_identity(found: dict) -> str:
+    parts = [display_text(found.get("email") or "?", 60)]
+    if found.get("org"):
+        parts.append("org %s" % display_text(found["org"], 40))
+    if found.get("plan"):
+        parts.append("plan %s" % display_text(found["plan"], 16))
+    if found.get("workspace"):
+        parts.append("workspace id %s" % display_text(found["workspace"], 8))
+    return " · ".join(parts)
+
+
+def logout_line(provider: str, pool: str) -> str:
+    """The exact sign-out command for one pool, with the pool directory spelled out (no routing)."""
+    d = pool_dir(provider, pool)
+    if provider == "claude":
+        return "CLAUDE_CONFIG_DIR=%s claude auth logout" % shlex.quote(d) if pool != "default" else "claude auth logout"
+    return "CODEX_HOME=%s codex logout" % shlex.quote(d) if pool != "default" else "codex logout"
 
 
 def cmd_route(a, cfg) -> int:
@@ -1543,25 +1654,32 @@ PROVIDER_WORDS = {"claude": "claude", "anthropic": "claude",
 INSTITUTION_SIGNUP = {
     "stanford.edu": {
         "name": "Stanford",
-        "claude": "Claude for Education: request it at https://uit.stanford.edu/service/claude (Standard is free with a "
-                  "SUNet ID; Premium, on a PTA or student account, adds quota and the Fable models). Then sign in at "
-                  "claude.ai with your @stanford.edu address and Continue with SSO.",
-        "codex": "ChatGPT Edu: request it at https://uit.stanford.edu/service/openai-chatgpt-edu. Standard is free "
-                 "and appears at sign-in as the workspace \"Stanford University Plus (Edu)\" (ChatGPT Plus-level "
-                 "limits); Pro is paid on a PTA or student account and appears as \"Stanford University Pro (Edu)\" "
-                 "(Pro-level limits). Both include Codex. Each sign-in binds to one workspace.",
+        "claude": "Claude for Education: https://uit.stanford.edu/service/claude. Standard is free for eligible active "
+                  "students, faculty, staff and postdocs (affiliate eligibility differs) and includes Claude Code; "
+                  "Premium adds usage and the Fable models and is paid (rates and commitments: "
+                  "https://uit.stanford.edu/rates/claude). Request it yourself; once provisioned, sign in at claude.ai "
+                  "with your Stanford e-mail and Continue with SSO.",
+        "codex": "ChatGPT Edu, which includes Codex: https://uit.stanford.edu/service/openai-chatgpt-edu. Start with "
+                 "Standard if you are eligible for the no-cost tier; Pro is optional and paid (rates: "
+                 "https://uit.stanford.edu/rates/openai-chatgpt-edu; paid tiers bill an approved PTA or an eligible "
+                 "student's tuition account). The sign-in picker has shown \"Stanford University Plus (Edu)\" and "
+                 "\"Stanford University Pro (Edu)\"; Plus appears to be Standard, but UIT has not confirmed that "
+                 "mapping for this guide. Choose the workspace you were provisioned; you may have only one. If you "
+                 "already use a personal account with your Stanford e-mail, read UIT's migration guidance first.",
     },
 }
 
 
-def signup_hints(domain: str | None = None) -> list[str]:
-    """The sign-up lines for one domain, or for every known institution when none is given."""
+def signup_hints(domain: str | None = None, provider: str | None = None) -> list[str]:
+    """The sign-up lines for one domain (or every known institution) and one provider (or both)."""
     out = []
     for dom, e in INSTITUTION_SIGNUP.items():
         if domain and not domain.lower().endswith(dom):
             continue
-        out.append("%s Claude: %s" % (e["name"], e["claude"]))
-        out.append("%s ChatGPT/Codex: %s" % (e["name"], e["codex"]))
+        if provider in (None, "claude"):
+            out.append("%s Claude: %s" % (e["name"], e["claude"]))
+        if provider in (None, "codex"):
+            out.append("%s ChatGPT/Codex: %s" % (e["name"], e["codex"]))
     return out
 
 
@@ -1728,6 +1846,24 @@ description: Route a job to a specific login or model through the bonsai CLI. Us
 `bonsai doctor` once per session if you have not seen the logins and model aliases; `bonsai route`
 shows which login a job would take and why.
 
+## Setting up for the user: what is yours and what is theirs
+
+If the user asks you to set Bonsai up (SETUP.md), say this first, in your own words: you can run
+the install commands and start a sign-in on their Mac; they complete every browser sign-in
+themselves (check the e-mail shown, enter credentials and the two-step code, pick the workspace,
+approve access). Before each sign-in you name the account and workspace it is for, and afterwards
+you ask which workspace they selected and record their answer in your reply; you never choose a
+workspace, submit an account request, or accept a purchase or an account migration for them. They
+must not send passwords, codes or credential files into the chat; a sign-in that asks for a code to
+be pasted into Terminal is one they run in their own Terminal window. The personal sign-ins (SETUP
+§5a, §5b) run in the user's own Terminal, not in your terminal tool: a bare `claude` or `codex`
+started from your session can sign in to your session's own config directory instead of theirs.
+For each `bonsai login` you start, wait for the process to exit and read its exit code and its last
+lines; a running command, a browser "success" page or a green `bonsai doctor` tools line is not a
+completed sign-in. On a non-zero exit, report the error and stop; do not retry in a loop, do not
+pass `--acknowledge`, and do not type `I understand` for them. Show the user the Bonsai notice in
+your reply before the first institution sign-in.
+
 ## What a routed job cannot protect — say this to the user before the first route in a session
 
 Before you run the first `bonsai job`, `pass` or `run` of a session, tell the user, in your reply,
@@ -1762,7 +1898,7 @@ Then:
 |---|---|
 | "route this to my stanford codex" / "stanford chatgpt" / "stanford openai" / "my stanford gpt" | `bonsai job stanford-codex -f <files> -o <out> "<the task>"` (`stanford-openai` and `stanford-chatgpt` are the same target) |
 | "route this to my stanford claude" / "stanford anthropic" | `bonsai job stanford-claude -f <files> -o <out> "<the task>"` (`stanford-anthropic` is the same target) |
-| "my stanford pro" / "the plus one" (two workspaces of one account, signed in as two pools) | the pool's own name from `bonsai doctor`: `bonsai job stanford-pro-codex ...` |
+| "my stanford pro" / "the plus one" (two workspaces of one account, signed in as two pools) | the pool whose workspace the user confirmed at sign-in, by its full label from `bonsai doctor` (for example `stanford-pro-codex` for the pool they confirmed as Pro, `stanford-codex` for the one they confirmed as Plus); never infer the workspace from a label or a board row, and ask if the association is unknown |
 | "ask astra" / "what does sol think" | `bonsai job astra -o <out> "<question>"` (or `sol`, `opus`, `sonnet`, `haiku`) |
 | "adversarial pass from astra on X" / "have sol try to break this" | `bonsai pass astra -f X -o X.pass-astra.md [--brief "<focus>"]` |
 | "...on stanford" added to any of the above | `bonsai pass astra@stanford -f X ...`, or `--pool stanford` |
@@ -1771,34 +1907,57 @@ Then:
 
 ## When the user has no institution account yet
 
-If `bonsai doctor` shows no `⌂ institution` login, or the user asks how to get "Stanford Claude" /
-"Stanford ChatGPT" / "Stanford Codex", point them at the request pages; these accounts are
-requested from the university, not created at claude.ai or chatgpt.com:
+If the user asks how to get "Stanford Claude" / "Stanford ChatGPT" / "Stanford Codex", or
+`bonsai doctor` says no institution login is recorded for a provider, point them at the
+university's request page for that provider. A missing Bonsai row does not mean they lack the
+account; they may only need to sign in, so ask first. These accounts are requested from the
+university, not created at claude.ai or chatgpt.com, and the request is theirs to submit (Stanford
+asks the requester for their own attestation):
 
-- Stanford Claude (Claude for Education): request at https://uit.stanford.edu/service/claude.
-  Standard is free with a SUNet ID; Premium (on a PTA or student account) adds quota and the Fable
-  models. Sign-in is at claude.ai with the @stanford.edu address and **Continue with SSO**.
-- Stanford ChatGPT / Codex (ChatGPT Edu): request at https://uit.stanford.edu/service/openai-chatgpt-edu.
-  Two tiers, which appear at Codex sign-in as two workspaces to choose between: **Stanford
-  University Plus (Edu)** is the free Standard tier (ChatGPT Plus-level limits); **Stanford
-  University Pro (Edu)** is the paid Pro tier (Pro-level limits, on a PTA or student account). Both
-  include Codex. A sign-in binds to one workspace; a second workspace is a second pool
-  (`bonsai login you@stanford.edu --codex --institution --pool stanford-pro --name stanford-pro`).
-- The invitation can take time; until the account exists on the web, `bonsai login` cannot sign it
-  in. Say so rather than retrying. `SETUP.md §5` is the screen-by-screen sign-in walk; tell the
-  user which step they are at (5a personal Claude, 5b personal ChatGPT, 5c Stanford Claude, 5d
-  Stanford ChatGPT).
+- Claude: https://uit.stanford.edu/service/claude. Eligible active students, faculty, staff and
+  postdocs can request Standard at no charge; affiliate eligibility differs. Standard includes
+  Claude Code; Premium adds higher usage and the Fable models. After provisioning: claude.ai, the
+  Stanford e-mail, **Continue with SSO**.
+- ChatGPT / Codex: https://uit.stanford.edu/service/openai-chatgpt-edu. Start with Standard if
+  eligible for the no-cost tier. Stanford's Edu offering includes Codex; confirm the workspace is
+  provisioned before CLI setup. Pro is an optional paid tier with higher usage.
+- Paid tiers bill an approved university funding account (PTA) or an eligible student's tuition
+  account; the requester's e-mail is not payment authorization. If the user asks about upgrading,
+  show the current rates and commitment terms at https://uit.stanford.edu/rates/claude or
+  https://uit.stanford.edu/rates/openai-chatgpt-edu. Never request, purchase, or attest on the
+  user's behalf, and never present a paid tier as a prerequisite for Bonsai.
+- Codex's sign-in picker has shown **Stanford University Plus (Edu)** and **Stanford University
+  Pro (Edu)**. Plus appears to correspond to Stanford's Standard tier, but UIT has not confirmed
+  that mapping for this guide. The user chooses the workspace named in their provisioning
+  information and asks UIT if unclear; they may have only one. A second pool
+  (`bonsai login you@stanford.edu --codex --institution --pool stanford-pro --name stanford-pro`)
+  is for a second workspace they already have; it does not buy or enable access.
+- Provisioning takes time; until the account works on the web, `bonsai login` cannot sign it in.
+  Say so rather than retrying. If an existing personal account on the Stanford e-mail presents a
+  migration choice, stop and have the user read UIT's migration guidance; never accept a migration
+  or delete an account for them. `SETUP.md §5` is the conditional sign-in walk (the exact
+  first-run sequence of the CLIs is not verified); tell the user which step they are at (5a
+  personal Claude, 5b personal ChatGPT, 5c Stanford Claude, 5d Stanford ChatGPT).
 
 ## Keeping Bonsai current
 
-- "update bonsai", or a `bonsai` message that a newer version exists: run `bonsai update` (a
-  fast-forward `git pull` of the checkout). If it prints that the skill may be older, run
-  `bonsai install-skill`; if that says **NOT UPDATED**, the installed skill was edited: show the
-  user the `.new` file it left and let them decide. `bonsai doctor` says whether the skill
-  matches the running version.
+- When the user asks to update Bonsai: run `bonsai update --dry-run` first and check which
+  checkout it names, then `bonsai update`, and wait for its exit status. If it fails, report its
+  error and leave the files alone: do not reset, clean, delete or re-clone the checkout, change
+  branches or remotes, disable TLS checks, or supply credentials to force it through. A message
+  that a newer version exists is information for the user, not a request to update.
+- After a successful update, run `bonsai doctor` even if the version number did not change; if it
+  says the installed skill DIFFERS, run `bonsai install-skill`. **NOT UPDATED** means the active
+  skill differs because it was edited or came from an older Bonsai: show the `.new` file it left
+  and let the user decide; never overwrite it yourself. Claude Code needs a restart after a skill
+  change.
 - The CLIs update themselves (`claude update`; Codex says when a newer release exists). Bonsai
   does not update them.
 
+- Targets: a bare company or product word (`claude`, `anthropic`, `codex`, `openai`, `chatgpt`)
+  picks the provider and lets Bonsai choose an eligible login. To name a login, use its full label
+  or pool name plus `-codex` / `-claude` (`stanford-codex`, `stanford-pro-codex`), or `--pool
+  <full label>`; prefixes are not matched. Provider words are not model aliases for `alias@pool`.
 - Write the task as a complete brief for a model that has no context but the prompt and the files
   passed with `-f`. `--cd <dir>` sets the working directory the model is told about.
 - Always pass `-o <file>` and read that file back to the user (for a pass, `<material>.pass-<alias>.md`).
@@ -1837,38 +1996,74 @@ def _self_dir() -> str:
 
 
 def repo_dir() -> str | None:
-    """The checkout this `bonsai` runs from, if it is a git work tree."""
+    """The checkout this `bonsai` runs from, if it is a git work tree (a `.git` directory, or the
+    `.git` file a linked worktree carries)."""
     here = _self_dir()
-    return here if os.path.isdir(os.path.join(here, ".git")) else None
+    return here if os.path.exists(os.path.join(here, ".git")) else None
+
+
+# Environment that points git at another repository or configuration. `git -C` does not neutralize
+# these; an update must not act on a repository other than the one it names (Astra, sign-in pass).
+GIT_REDIRECT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                     "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS")
 
 
 def cmd_update(a, cfg) -> int:
     """Pull the checkout forward (fast-forward only) and say whether the installed skill still matches."""
     d = repo_dir()
     if not d:
-        raise SystemExit("bonsai: this copy is not a git checkout (%s); replace the folder with a newer one, or "
-                         "clone it: git clone https://github.com/treemarks/bonsai ~/code/bonsai" % _self_dir())
+        raise SystemExit("bonsai: this copy (%s) is not a git checkout, so it cannot pull. Keep it; get a newer "
+                         "copy into a different, empty folder (git clone https://github.com/treemarks/bonsai "
+                         "<new folder>, or the folder you are handed), check it with `<new folder>/bonsai doctor`, "
+                         "then point ~/.local/bin/bonsai at it." % _self_dir())
+    if any(k in os.environ for k in GIT_REDIRECT_VARS):
+        print("bonsai: update stopped: this shell overrides git's repository or configuration (%s). Run the update "
+              "from a new Terminal window without those overrides." % ", ".join(k for k in GIT_REDIRECT_VARS if k in os.environ),
+              file=sys.stderr)
+        return 2
     git = shutil.which("git")
     if not git:
         raise SystemExit("bonsai: git is not installed. " + INSTALL["git"]["windows" if IS_WIN else "darwin"])
-    before = VERSION
-    print("bonsai: updating %s (bonsai %s)" % (d, before))
+
+    def g(*args):
+        return subprocess.run([git, "-C", d, *args], capture_output=True, text=True)
+
+    branch = g("symbolic-ref", "-q", "--short", "HEAD")
+    if branch.returncode != 0:
+        print("bonsai: update stopped: %s is not on a branch (detached), so there is nothing to pull onto. Keep this "
+              "folder; get a fresh copy into a different, empty folder, or ask whoever gave you this one which branch "
+              "it should follow." % d, file=sys.stderr)
+        return 2
+    before, before_commit = VERSION, (g("rev-parse", "--short", "HEAD").stdout.strip() or "?")
+    print("bonsai: updating %s (bonsai %s, %s, branch %s)" % (d, before, before_commit, branch.stdout.strip()))
     sys.stdout.flush()
     if a.dry_run:
-        print("would run: git -C %s pull --ff-only" % d)
+        print("would run: git -C %s pull --ff-only" % shlex.quote(d))
         return 0
     rc = subprocess.call([git, "-C", d, "pull", "--ff-only"])
     if rc != 0:
-        print("bonsai: git pull did not complete (exit %d). Local edits in the checkout? `git -C %s status`." % (rc, d),
+        print("bonsai: git pull did not complete (exit %d); nothing of yours was changed. If git mentioned local "
+              "changes, files in %s were edited on this Mac: keep or review them (`git -C %s status` lists them) "
+              "before updating again. If it mentioned the network, a proxy or a certificate, the download could not "
+              "reach GitHub from this network; do not disable certificate checks. If it said the branches have "
+              "diverged, get a fresh copy into a different, empty folder instead." % (rc, d, shlex.quote(d)),
               file=sys.stderr)
         return rc
     r = subprocess.run([sys.executable, os.path.join(d, "bonsai"), "--version"], capture_output=True, text=True)
-    after = (r.stdout.strip().split() or ["?", "?"])[-1]
-    print("bonsai: %s -> %s" % (before, after) if after != before else "bonsai: already %s" % before)
+    if r.returncode != 0 or not r.stdout.strip().startswith("bonsai "):
+        print("bonsai: files were updated, but the new Bonsai could not report its version. The update is incomplete; "
+              "keep this folder and ask the maintainer for help (github.com/treemarks/bonsai/issues).", file=sys.stderr)
+        return 1
+    after, after_commit = r.stdout.strip().split()[-1], (g("rev-parse", "--short", "HEAD").stdout.strip() or "?")
+    if after_commit == before_commit:
+        print("bonsai: already current (%s, %s)" % (after, after_commit))
+        return 0
+    print("bonsai: %s (%s) -> %s (%s)" % (before, before_commit, after, after_commit))
     skill = os.path.join(HOME, ".claude", "skills", "bonsai-route", "SKILL.md")
-    if os.path.isfile(skill) and after != before:
-        print("bonsai: the skill Claude Code uses may be older than this version: run `bonsai install-skill` "
-              "(it refuses to overwrite a skill you edited and leaves a .new file instead).")
+    if os.path.isfile(skill):
+        print("bonsai: run `bonsai doctor`; if it says the installed skill DIFFERS from this version, run "
+              "`bonsai install-skill` (it refuses to overwrite a skill you edited and leaves a .new file instead; "
+              "restart Claude Code after a skill change).")
     return 0
 
 
@@ -1918,6 +2113,9 @@ def main(argv=None) -> int:
     s.add_argument("--pool", help="directory name for this sign-in when one e-mail has several workspaces "
                                   "(default: the e-mail); pair it with --name, e.g. --pool stanford-pro --name stanford-pro")
     s.add_argument("--sso", action="store_true", help="(claude) force the SSO flow")
+    s.add_argument("--device-auth", action="store_true",
+                   help="(codex) sign in with a one-time code instead of the browser callback on port 1455 "
+                        "(the workspace must allow device-code sign-in)")
     s.add_argument("--acknowledge", action="store_true", help="you have read the institution notice (for scripts)")
     s.set_defaults(fn=cmd_login)
 
@@ -1934,7 +2132,7 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_route)
 
     s = parser("run", help="run any command under a login: bonsai run --pool stanford -- codex ...")
-    s.add_argument("--pool", default="auto", help="auto, a login name (stanford), or an e-mail")
+    s.add_argument("--pool", default="auto", help="auto, or a login's full label (stanford) or e-mail; no prefixes")
     s.add_argument("--provider", choices=["claude", "codex"], help="needed for a wrapper that is not claude or codex itself")
     s.add_argument("--kind", choices=["general", "sensitive"], default=None)
     s.add_argument("--data", choices=["low", "moderate", "high", "phi", "restricted"])
@@ -1947,7 +2145,7 @@ def main(argv=None) -> int:
                                       "stanford-claude (= stanford-anthropic) | personal-claude | astra | sol | opus | astra@stanford")
         s.add_argument("-m", "--model", help="a model id or alias")
         s.add_argument("--effort", choices=["low", "medium", "high", "xhigh"])
-        s.add_argument("--pool", help="override the login: a name or e-mail")
+        s.add_argument("--pool", help="override the login: its full label or e-mail as `bonsai doctor` lists it (no prefixes)")
         s.add_argument("--kind", choices=["general", "sensitive"], default=None,
                        help="general: personal logins; sensitive: institution seats only (default: config default_kind)")
         s.add_argument("--data", choices=["low", "moderate", "high", "phi", "restricted"],

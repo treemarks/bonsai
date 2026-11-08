@@ -86,6 +86,16 @@ proves approval for any data; check the account and organization `bonsai doctor`
 (default `stanford` for a stanford.edu address, else the domain). A second personal login is
 `bonsai login other@gmail.com --claude` with no flag.
 
+After each sign-in Bonsai prints what actually signed in (for Claude the e-mail, organization and
+plan from `claude auth status`; for Codex the e-mail, plan type such as `edu_pro`, and the last
+four characters of the ChatGPT account id, which is the workspace) and refuses to record a sign-in
+whose e-mail is not the one asked for, printing the exact sign-out line instead. One e-mail with
+two ChatGPT workspaces is two pools: `--pool stanford-pro --name stanford-pro` for the second;
+two pools showing one workspace id are the same workspace signed in twice. Logins are named
+exactly (`stanford`, `stanford-pro`, or the e-mail), never by prefix, and routing words (`auto`,
+`codex`, `openai`, `astra`, ...) are refused as pool names. `--device-auth` (Codex) uses the
+one-time-code sign-in when the browser callback on port 1455 cannot complete.
+
 ## The board
 
 ```

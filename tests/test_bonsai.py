@@ -125,12 +125,37 @@ class Routing(unittest.TestCase):
         cfg = bonsai.load_config()
         r = bonsai.pick(rows(), "codex", "general", "stanford", cfg)
         self.assertEqual(r["pool"], "me@stanford.edu")
-        r = bonsai.pick(rows(), "codex", "general", "me@stan", cfg)
+        r = bonsai.pick(rows(), "codex", "general", "ME@stanford.edu", cfg)   # the full pool name, any case
         self.assertEqual(r["pool"], "me@stanford.edu")
+        with self.assertRaises(SystemExit):
+            bonsai.pick(rows(), "codex", "general", "me@stan", cfg)   # prefixes are not matched
         with self.assertRaises(SystemExit):
             bonsai.pick(rows(), "codex", "general", "nobody", cfg)
         with self.assertRaises(SystemExit):
             bonsai.pick(rows(), "claude", "general", None, cfg)   # no personal claude login here
+
+    def test_second_workspace_does_not_capture_the_first_target(self):
+        # Astra, sign-in pass: with `stanford` and `stanford-pro` both present (one e-mail, two
+        # workspaces), `stanford` must still mean the first pool, and the e-mail must not be ambiguous.
+        cfg = bonsai.load_config()
+        st = rows()
+        st["rows"].append({"pool": "stanford-pro", "provider": "codex", "state": "OK", "name": "stanford-pro",
+                           "institution": True, "account": "me@stanford.edu",
+                           "wk": 10, "wk_at": NOW + 86400, "5h": 0, "5h_at": NOW + 3600})
+        for r in st["rows"]:
+            if r["pool"] == "me@stanford.edu" and r["provider"] == "codex":
+                r["account"] = "me@stanford.edu"
+        self.assertEqual(bonsai.pick(st, "codex", "general", "stanford", cfg)["pool"], "me@stanford.edu")
+        self.assertEqual(bonsai.pick(st, "codex", "general", "stanford-pro", cfg)["pool"], "stanford-pro")
+        self.assertEqual(bonsai.pick(st, "codex", "general", "me@stanford.edu", cfg)["pool"], "me@stanford.edu")
+        with self.assertRaises(SystemExit):
+            bonsai.pick(st, "codex", "general", "stanf", cfg)
+
+    def test_reserved_names_are_not_pools(self):
+        for word in ("auto", "codex", "openai", "chatgpt", "anthropic", "astra", "Claude"):
+            with self.assertRaises(SystemExit):
+                bonsai.check_pool_name(word)
+        self.assertEqual(bonsai.check_pool_name("stanford-pro"), "stanford-pro")
 
     def test_targets(self):
         cfg = bonsai.load_config()
@@ -175,9 +200,11 @@ class Routing(unittest.TestCase):
         os.environ["ANTHROPIC_API_KEY"] = "sk-test"
         os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = "tok"
         os.environ["OPENAI_API_KEY"] = "sk-test"
+        os.environ["SSL_CERT_FILE"] = "/etc/ssl/campus.pem"
         env = bonsai.child_env("codex", "me@stanford.edu")
         for k in ("CLAUDECODE", "CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY"):
             self.assertNotIn(k, env)
+        self.assertEqual(env.get("SSL_CERT_FILE"), "/etc/ssl/campus.pem")  # an IT CA bundle is not a credential
         self.assertEqual(env["CODEX_HOME"], os.path.join(FAKE, ".codex-pools", "me@stanford.edu"))
         # The default pool is the CLI's own home, reached by leaving the variable unset.
         env = bonsai.child_env("claude", "default")
@@ -360,6 +387,30 @@ class Discovery(unittest.TestCase):
             self.assertEqual(logins["stanford-pro"]["name"], "stanford-pro")
             self.assertEqual(logins["a@stanford.edu"]["name"], "stanford")
             self.assertTrue(os.path.isdir(bonsai.pool_dir("codex", "stanford-pro")))
+            # A label that already names another pool is refused before anything is created.
+            with self.assertRaises(SystemExit):
+                login("c@stanford.edu", "codex", pool="c-pool", name="stanford")
+            # The sign-in that completed is checked against the e-mail asked for; a mismatch records nothing.
+            real_identity = bonsai.login_identity
+            bonsai.login_identity = lambda provider, pool, d: {"email": "roommate@example.test", "plan": "plus"}
+            try:
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err):
+                    rc4, _ = login("d@stanford.edu", "codex")
+                self.assertEqual(rc4, 1)
+                self.assertIn("roommate@example.test", err.getvalue())
+                self.assertIn("codex logout", err.getvalue())
+                self.assertNotIn("d@stanford.edu", bonsai.load_config()["logins"])
+            finally:
+                bonsai.login_identity = real_identity
+            # --device-auth reaches codex, and only codex.
+            seen = []
+            subprocess.call = lambda argv, env=None: seen.append(argv) or 0
+            a = argparse.Namespace(email="e@stanford.edu", name=None, pool=None, institution=False, acknowledge=False,
+                                   sso=False, device_auth=True, claude=False, codex=True)
+            with contextlib.redirect_stdout(io.StringIO()):
+                bonsai.cmd_login(a, bonsai.load_config())
+            self.assertEqual(seen[-1][-2:], ["login", "--device-auth"])
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 bonsai.ensure_notice(bonsai.load_config(), "job")  # the first job: no second printing
@@ -375,10 +426,22 @@ class Discovery(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         text = "\n".join(lines)
         for needle in ("uit.stanford.edu/service/claude", "uit.stanford.edu/service/openai-chatgpt-edu",
-                       "Stanford University Plus (Edu)", "Stanford University Pro (Edu)", "Continue with SSO"):
+                       "Stanford University Plus (Edu)", "Stanford University Pro (Edu)", "Continue with SSO",
+                       "not confirmed", "rates"):
             self.assertIn(needle, text)
         self.assertEqual(bonsai.signup_hints("x@nowhere.edu"), [])
         self.assertEqual(bonsai.signup_hints(), lines)
+        self.assertEqual(len(bonsai.signup_hints(provider="codex")), 1)
+
+    def test_codex_identity_labels(self):
+        import base64
+        claims = {"email": "s@stanford.edu", "https://api.openai.com/auth": {"chatgpt_plan_type": "edu_pro",
+                                                                            "chatgpt_account_id": "acct-0000d78a"}}
+        body = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+        ident = bonsai.codex_identity({"id_token": "h.%s.s" % body, "account_id": "acct-0000d78a", "access_token": "x"})
+        self.assertEqual(ident, {"email": "s@stanford.edu", "plan": "edu_pro", "workspace": "…d78a"})
+        self.assertEqual(bonsai.describe_identity(ident), "s@stanford.edu · plan edu_pro · workspace id …d78a")
+        self.assertEqual(bonsai.codex_identity({"access_token": "x"}), {"email": None, "plan": None, "workspace": None})
 
     def test_update_outside_a_checkout_says_so(self):
         import argparse, io, contextlib
@@ -396,6 +459,15 @@ class Discovery(unittest.TestCase):
                 self.assertEqual(bonsai.cmd_update(argparse.Namespace(dry_run=True), bonsai.load_config()), 0)
             self.assertIn("git -C", out.getvalue())
             self.assertIn("--ff-only", out.getvalue())
+            # A shell that points git elsewhere stops the update before anything runs.
+            os.environ["GIT_DIR"] = "/elsewhere/.git"
+            try:
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err):
+                    self.assertEqual(bonsai.cmd_update(argparse.Namespace(dry_run=False), bonsai.load_config()), 2)
+                self.assertIn("GIT_DIR", err.getvalue())
+            finally:
+                del os.environ["GIT_DIR"]
 
     def test_display_text_escapes_controls(self):
         self.assertEqual(bonsai.display_text("a\x1b[2Jb\n"), "a\\u001b[2Jb\\u000a")

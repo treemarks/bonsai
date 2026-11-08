@@ -64,23 +64,38 @@ means that account. The mark does not verify that you picked the Stanford worksp
 carries everyday work. If you add a personal ChatGPT login later (`codex`, sign in), it joins the
 board as `personal` (oai).
 
-**Never signed in to a CLI before?** That is what `SETUP.md` §5 is for: it says, screen by screen,
-what each sign-in shows and what to pick, including the ChatGPT "Select a workspace" page (Stanford
-Standard appears there as *Stanford University Plus (Edu)*; Pro as *Stanford University Pro (Edu)*)
-and the Claude page where you choose **Continue with SSO** for the Stanford account.
+**Never signed in to a CLI before?** That is what `SETUP.md` §5 is for: conditional sign-in
+instructions that name each screen you may meet and what to choose on it, including the ChatGPT
+"Select a workspace" page (two labels seen there: *Stanford University Plus (Edu)* and *Stanford
+University Pro (Edu)*) and the Claude page where you choose **Continue with SSO** for the Stanford
+account. The exact first-run order of the CLIs has not been verified from a fresh account, so choose
+by the words on the screen, not by position.
+
+**If Claude Code does the setup for you:** it runs the commands and starts each sign-in; you
+complete every browser page yourself (e-mail, password, two-step, workspace, approve) and tell it
+which workspace you chose. It must not choose a workspace, request an account, or accept a purchase
+or an account migration for you, and you never send it a password, a code or a credential file.
+Run the personal sign-ins (SETUP §5a, §5b) in your own Terminal window, not in its terminal tool.
+After each sign-in Bonsai prints the e-mail (and for Codex the plan and a short workspace id) that
+actually signed in, and refuses to record a different e-mail than the one asked for.
 
 **Don't have the Stanford accounts yet?** They are requested from Stanford, not created at
-claude.ai or chatgpt.com: [Claude for Education](https://uit.stanford.edu/service/claude) (Standard
-free; Premium paid, more quota and the Fable models) and
-[ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu) (Standard free, which is the
-*Plus (Edu)* workspace with Plus-level limits; Pro paid on a PTA or student account, the *Pro (Edu)*
-workspace with Pro-level limits; both include Codex). Request first, sign in once the invitation
-arrives. Claude Code knows this too: ask it "how do I get Stanford Codex" and it points you there.
+claude.ai or chatgpt.com, and the request is yours to submit:
+[Claude for Education](https://uit.stanford.edu/service/claude) (Standard free for eligible active
+students, faculty, staff and postdocs, includes Claude Code; Premium paid, more usage and the Fable
+models) and [ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu) (Standard free if
+eligible; Pro optional and paid; both include Codex). Paid tiers bill a PTA or an eligible
+student's tuition account, and nothing in Bonsai needs one. The *Plus (Edu)* workspace appears to
+be Standard, but UIT has not confirmed that mapping; choose the workspace you were provisioned.
+If you already use a personal account on your Stanford e-mail, read UIT's migration guidance
+before requesting. Claude Code knows all this: ask it "how do I get Stanford Codex".
 
-**No GitHub account needed.** The clone in `SETUP.md` §4 is an anonymous download; if someone
-hands you the folder instead, drop it at `~/code/bonsai` and skip the clone. Later, `bonsai update`
-(or "update bonsai" in Claude Code) pulls the newest version and says when to re-run
-`bonsai install-skill`.
+**No GitHub account needed.** The clone in `SETUP.md` §4, `bonsai update` and the Codex release
+download are anonymous HTTPS downloads from GitHub's public hosts; if anything asks you for a
+GitHub username, stop and check the network rather than make an account. If someone hands you the
+folder instead, drop it at `~/code/bonsai` and skip the clone. Later, `bonsai update` (or "update
+bonsai" in Claude Code) pulls the newest version onto the checkout it runs from and says when to
+re-run `bonsai install-skill`; it refuses to touch a checkout a shell has redirected git away from.
 
 ## The steps
 
