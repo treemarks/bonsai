@@ -50,8 +50,12 @@ chat.)
 | You say | The login | Bonsai's name for it | How it gets there |
 |---|---|---|---|
 | "my Claude" | personal Claude Pro | `personal` (ant) | already there once `claude` is signed in |
-| "my Stanford Claude" | Claude for Education seat | `stanford` (ant) ⌂ | `bonsai login you@stanford.edu --claude --institution` |
-| "my Stanford Codex" / "Stanford ChatGPT" | ChatGPT Edu seat | `stanford` (oai) ⌂ | `bonsai login you@stanford.edu --codex --institution` |
+| "my Stanford Claude" / "my Stanford Anthropic" | Claude for Education seat | `stanford` (ant) ⌂ | `bonsai login you@stanford.edu --claude --institution` |
+| "my Stanford Codex" / "Stanford ChatGPT" / "Stanford OpenAI" | ChatGPT Edu seat | `stanford` (oai) ⌂ | `bonsai login you@stanford.edu --codex --institution` |
+
+Those are the same seats under different names: `stanford-codex`, `stanford-chatgpt` and
+`stanford-openai` are one target, `stanford-claude` and `stanford-anthropic` another. You do not
+need to know which CLI serves which; say the company or the product and Bonsai picks the CLI.
 
 The `⌂` means "marked institution by you": `auto` routing uses such an account only for
 `--kind sensitive` work and never for everyday jobs; a named target (`stanford-codex`) always
@@ -59,6 +63,11 @@ means that account. The mark does not verify that you picked the Stanford worksp
 (check what `bonsai doctor` shows) and does not mean approval for any data. Your personal Pro
 carries everyday work. If you add a personal ChatGPT login later (`codex`, sign in), it joins the
 board as `personal` (oai).
+
+**Never signed in to a CLI before?** That is what `SETUP.md` §5 is for: it says, screen by screen,
+what each sign-in shows and what to pick, including the ChatGPT "Select a workspace" page (Stanford
+Standard appears there as *Stanford University Plus (Edu)*; Pro as *Stanford University Pro (Edu)*)
+and the Claude page where you choose **Continue with SSO** for the Stanford account.
 
 ## The steps
 

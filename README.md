@@ -160,7 +160,11 @@ bonsai job codex -o out.md -- "-starts with a dash"             # -- before a pr
 
 Targets: `claude` / `codex` (auto login), `<login>-claude` / `<login>-codex` (`stanford-codex`,
 `personal-claude`), a model alias (`astra`, `sol`, `opus`, `sonnet`, `haiku`; edit them with
-`bonsai config --set 'models.astra=["codex","gpt-6-astra"]'`), or `<alias>@<login>`.
+`bonsai config --set 'models.astra=["codex","gpt-6-astra"]'`), or `<alias>@<login>`. The
+company, the product and the CLI name the same seat: `stanford-openai`, `stanford-chatgpt` and
+`stanford-gpt` are `stanford-codex`; `stanford-anthropic` is `stanford-claude`. A login signed in
+under its own `--pool` name (a second workspace of one account, say `stanford-pro`) is
+`stanford-pro-codex`.
 
 `-f` puts each file into the prompt as a JSON object (name and content; UTF-8 text only, 400 KB
 each, 1.6 MB in all). `-o` writes the model's final message to a file, atomically, and leaves the
@@ -216,8 +220,9 @@ an edited one: then it says **NOT UPDATED**, exits 2, and leaves the new version
 `SKILL.md.new` for you to review and move over (`bonsai doctor` says whether the installed skill
 matches this version). From then on, in any Claude Code session:
 
-> route this to my stanford codex · ask astra whether the proof holds · call an adversarial pass
-> from sol on this draft · use my personal account
+> route this to my stanford codex (or: my stanford chatgpt, my stanford openai) · send it to my
+> stanford claude (my stanford anthropic) · ask astra whether the proof holds · call an
+> adversarial pass from sol on this draft · use my personal account
 
 ...and Claude Code runs the matching `bonsai` command, writes the result to a file beside the
 material, and reads it back to you. The skill carries the rule from the box at the top: before its

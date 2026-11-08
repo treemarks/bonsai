@@ -140,6 +140,15 @@ class Routing(unittest.TestCase):
         self.assertEqual(bonsai.resolve_target("astra@stanford", cfg, None), ("codex", "stanford", "gpt-6-astra"))
         self.assertEqual(bonsai.resolve_target("opus", cfg, None), ("claude", None, "claude-opus-5-5"))
         self.assertEqual(bonsai.resolve_target("codex", cfg, "gpt-5-mini"), ("codex", None, "gpt-5-mini"))
+        # The company, the product and the CLI are one seat: Stanford OpenAI = Stanford ChatGPT = Stanford Codex.
+        for word in ("stanford-openai", "stanford-chatgpt", "stanford-gpt", "Stanford-OpenAI"):
+            self.assertEqual(bonsai.resolve_target(word, cfg, None), ("codex", "stanford", None), word)
+        self.assertEqual(bonsai.resolve_target("stanford-anthropic", cfg, None), ("claude", "stanford", None))
+        self.assertEqual(bonsai.resolve_target("stanford-pro-codex", cfg, None), ("codex", "stanford-pro", None))
+        self.assertEqual(bonsai.resolve_target("openai", cfg, None), ("codex", None, None))
+        self.assertEqual(bonsai.resolve_target("anthropic", cfg, None), ("claude", None, None))
+        with self.assertRaises(SystemExit):
+            bonsai.resolve_target("-codex", cfg, None)  # a suffix with no login before it is not a target
         with self.assertRaises(SystemExit):
             bonsai.resolve_target("mystery", cfg, None)
         with self.assertRaises(SystemExit):
@@ -330,8 +339,8 @@ class Discovery(unittest.TestCase):
         bonsai.save_config(cfg)
         try:
             builtins.input = lambda prompt="": asked.append(prompt) or "I understand"
-            def login(email, provider):
-                a = argparse.Namespace(email=email, name=None, institution=True, acknowledge=False, sso=False,
+            def login(email, provider, pool=None, name=None):
+                a = argparse.Namespace(email=email, name=name, pool=pool, institution=True, acknowledge=False, sso=False,
                                        claude=provider == "claude", codex=provider == "codex")
                 out = io.StringIO()
                 with contextlib.redirect_stdout(out):
@@ -344,6 +353,13 @@ class Discovery(unittest.TestCase):
             rc2, out2 = login("b@othercollege.edu", "codex")  # a different institution login
             self.assertEqual((rc, rc2, len(asked)), (0, 0, 1))
             self.assertNotIn("Before you use Bonsai", out + out2)
+            # One e-mail, a second workspace: its own pool directory and its own name on the board.
+            rc3, _ = login("a@stanford.edu", "codex", pool="stanford-pro", name="stanford-pro")
+            self.assertEqual(rc3, 0)
+            logins = bonsai.load_config()["logins"]
+            self.assertEqual(logins["stanford-pro"]["name"], "stanford-pro")
+            self.assertEqual(logins["a@stanford.edu"]["name"], "stanford")
+            self.assertTrue(os.path.isdir(bonsai.pool_dir("codex", "stanford-pro")))
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 bonsai.ensure_notice(bonsai.load_config(), "job")  # the first job: no second printing

@@ -106,35 +106,136 @@ step 5 it shows the two `default` pools as `no-login`; that is expected.
 
 ## 5. Sign in
 
-Your everyday logins first, so the CLIs themselves work:
+This section assumes you have never signed in to a command-line tool. Each sign-in is the same
+shape: a command in Terminal, a page that opens in your browser, and Terminal noticing when the
+page is done. Nothing is typed into Terminal except the commands shown (and, once, `I understand`).
+You never type a password into Terminal; passwords go only into the browser pages.
+
+**Before you start.** Each account must already exist: a personal Claude or ChatGPT account you
+can sign in to on the web, and, for Stanford, an account that Stanford has provisioned. Stanford's
+seats are requested, not self-served: [Claude for Education](https://uit.stanford.edu/service/claude)
+(Standard is free with a SUNet ID) and [ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu)
+(Standard free; Pro on a PTA or student account), each through its request form on that page. If you
+cannot sign in to `claude.ai` or `chatgpt.com` with the account in a normal browser tab, the CLI
+cannot sign in with it either; sort that out first.
+
+**Which account is which.** On a MacBook with a personal Claude Pro and two Stanford seats you
+will do four sign-ins: personal Claude (step 5a), personal ChatGPT if you have one (5b), Stanford
+Claude (5c), Stanford ChatGPT (5d). Each browser page asks you to sign in; use the account that
+step names, and if the browser is already signed in to another account on that site, the page
+may skip straight to a choice of accounts or workspaces: choose the one the step names.
+
+### 5a. Personal Claude: `claude`
 
 ```bash
-claude          # follow the sign-in in the browser; then /exit
-codex           # follow the sign-in in the browser; then Ctrl-C
+claude
 ```
 
-Those become the `personal` row on the board. Then each institution account as its own pool.
-These are separate saved sign-ins: adding Stanford does not change the account of any chat you
-have open.
+1. The first run asks a few setup questions in Terminal (a colour theme and the like): press
+   Return to accept each default.
+2. At the login question, choose the **Claude account with subscription** option (your Pro, Max,
+   Team or Education account on claude.ai), not *Anthropic Console* (API billing) and not
+   *3rd-party platform*. Move with the arrow keys, confirm with Return.
+3. Your browser opens on claude.ai. Sign in with your personal account (the one you use at
+   claude.ai), then approve the request to let Claude Code use it. If the browser does not open,
+   press `c` in Terminal to copy the link and paste it into a browser yourself.
+4. Two endings are normal: the browser says you can close the tab and Terminal shows
+   `Login successful`; or the browser shows a code instead, which you paste into Terminal at
+   `Paste code here if prompted`, then Return.
+5. Press Return when Terminal asks, then type `/exit` and Return to leave Claude Code.
+
+Check: `claude auth status` prints a block of lines; `"loggedIn": true` and your e-mail should be
+among them.
+
+### 5b. Personal ChatGPT, if you have one: `codex`
+
+```bash
+codex
+```
+
+1. The first screen offers **Sign in with ChatGPT** (first option) and *Provide your own API
+   key*. Press Return on **Sign in with ChatGPT**. (A third option, *Sign in with Device Code*, is
+   for a machine with no browser; you do not need it.)
+2. Your browser opens on OpenAI's sign-in. Sign in with your personal ChatGPT account.
+3. If that account belongs to more than one workspace, the page says **Select a workspace** and
+   lists them, each with a small building or person icon. For this step choose your *personal*
+   workspace, not a Stanford one, then **Continue**.
+4. The browser says you are signed in and can return to the terminal; Terminal shows the Codex
+   prompt. Press Ctrl-C (hold Control, press C) once or twice to leave Codex.
+
+Check: `codex login status` prints `Logged in using ChatGPT`.
+
+If the browser never opens, or shows a connection error for a `localhost` address after you sign
+in, run `codex login --device-auth` instead: it prints a short code and a link; open the link,
+sign in, type the code. (Codex's browser sign-in listens on your own Mac at port 1455; VPNs and
+some campus networks block that page.)
+
+Those two are the `personal` rows on the board. Now the Stanford accounts, each as its own pool.
+These are separate saved sign-ins: adding Stanford does not sign anything else out, and does not
+change the account of any chat you have open.
+
+### 5c. Stanford Claude: `bonsai login ... --claude --institution`
 
 ```bash
 bonsai login you@stanford.edu --claude --institution
-bonsai login you@stanford.edu --codex  --institution
 ```
 
-The first `--institution` prints the notice from the top of this file and asks you to type
-`I understand` — into this Terminal window, then Return (not into the browser or a chat). It asks
-once, on this first login only; the second line and everything after it do not ask again. When
-the command is run by a script or an agent rather than a person, the notice is printed and the
-sign-in proceeds without that prompt, which is why the agent must show you the notice itself.
-Each line then opens the provider's sign-in page in your browser; pick the institution organization
-or workspace when asked. The account is recorded as an institution account for that provider only
-when its sign-in completes.
+1. This first `--institution` prints the notice from the top of this file and asks you to type
+   `I understand` — into this Terminal window, then Return (not into the browser or a chat). It
+   asks once, on this first login only; the second Stanford login and everything after it do not
+   ask again. (When a script or an agent runs this rather than a person, the notice is printed and
+   the sign-in proceeds without that prompt, which is why the agent must show you the notice
+   itself.)
+2. Terminal prints a link and opens it in your browser; your Stanford address is already filled
+   in. If the browser does not open, copy the link from Terminal and paste it into a browser.
+3. On the claude.ai page choose **Continue with SSO** (not the password box): that is how
+   Stanford's Claude for Education signs in. The Stanford login (SUNet ID and password, then the
+   two-step prompt) follows. If the page offers more than one organization, choose Stanford's.
+   If SSO is not offered, run the same line again with `--sso` added.
+4. Approve the request to let Claude Code use the account. As in 5a, either the browser finishes
+   on its own or it shows a code to paste into Terminal.
+5. Terminal says `signed in` and then prints what Bonsai recorded. The line ends with a reminder
+   to check what `bonsai doctor` shows for this login.
 
-Then `bonsai doctor` again: it should now show each login as `signed in as ...` with its account
-and organization, the Stanford ones marked `⌂ institution (marked by you; workspace approval not
-verified)`. Check the account and organization shown: your university e-mail and the `⌂` mark do
-not prove you picked the university workspace, and neither proves approval for any data.
+### 5d. Stanford ChatGPT (Codex): `bonsai login ... --codex --institution`
+
+```bash
+bonsai login you@stanford.edu --codex --institution
+```
+
+1. The browser opens on OpenAI's sign-in. Enter your `@stanford.edu` address; it sends you through
+   the Stanford login (SUNet ID, password, two-step).
+2. The page says **Select a workspace** and lists what that address holds. Stanford's free
+   Standard tier appears as **Stanford University Plus (Edu)**; the paid tier as **Stanford
+   University Pro (Edu)**. Pick the one you have (Plus, for most students) and press
+   **Continue**. Each sign-in binds to one workspace; the two are separate accounts with separate
+   usage limits, and Codex's own rule for switching is to sign out and in again.
+3. The browser says you are signed in; Terminal prints what Bonsai recorded.
+
+If you have both workspaces and want both on the board, sign in a second time into a pool of its
+own; the second sign-in is the same walk with the other workspace chosen:
+
+```bash
+bonsai login you@stanford.edu --codex --institution --pool stanford-pro --name stanford-pro
+```
+
+It shows on the board as `stanford-pro` and is the target `stanford-pro-codex`. If the page says
+the workspace does not exist, Stanford's FAQ says that is the browser's cache: open a private
+window and sign in there with your `sunetid@stanford.edu` address.
+
+### Then check
+
+`bonsai doctor` should now show each login as `signed in as ...` with its account and
+organization, the Stanford ones marked `⌂ institution (marked by you; workspace approval not
+verified)`. Read the account and organization on each line: your university e-mail and the `⌂`
+mark do not prove you picked the university workspace, and neither proves approval for any data.
+A login that signed in but shows `no-login` or `re-login` was recorded without a completed sign-in;
+run its line again.
+
+Where the sign-ins live: Claude keeps each pool's credential in your login Keychain, Codex in the
+pool folder's `auth.json`. Signing out is `bonsai run --pool stanford -- codex logout` (Codex) or
+`bonsai run --pool stanford -- claude auth logout` (Claude); personal logins sign out with the
+CLIs' own `codex logout` and `claude auth logout`.
 
 ## 6. Check it works
 

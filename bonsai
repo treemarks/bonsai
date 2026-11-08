@@ -72,7 +72,7 @@ MIN_USABLE_PCT = 10.0        # under this much room a login is held, not routed 
 DEFAULT_INTERVAL = 300       # seconds between probes; the floor is 180
 FILE_LIMIT = 400_000         # bytes of one -f file that go into a prompt
 PROMPT_LIMIT = 1_600_000     # bytes of the whole prompt
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 USER_AGENT = "bonsai/%s (+https://github.com/treemarks/bonsai)" % VERSION
 
 # How to get each tool on a machine that has nothing. `bonsai doctor` prints the line for
@@ -1400,7 +1400,9 @@ def cmd_login(a, cfg) -> int:
     tool = shutil.which(provider)
     if not tool:
         raise SystemExit("bonsai: %s is not installed. %s" % (provider, INSTALL[provider]["windows" if IS_WIN else "darwin"]))
-    pool = check_pool_name(a.email)
+    # The pool is the e-mail unless --pool names another directory: one account can hold two
+    # workspaces (ChatGPT shows "Select a workspace"), and each sign-in binds to one of them.
+    pool = check_pool_name(getattr(a, "pool", None) or a.email)
     if pool == "default":
         raise SystemExit("bonsai: `default` is the CLI's own sign-in; run `%s` itself to sign that in" % provider)
     d = pool_dir(provider, pool)
@@ -1412,7 +1414,7 @@ def cmd_login(a, cfg) -> int:
         if not getattr(a, "acknowledge", False) and sys.stdin.isatty():
             if input("Type  I understand  to continue: ").strip().lower() != "i understand":
                 raise SystemExit("bonsai: not acknowledged; nothing changed")
-    argv = [tool, "auth", "login", "--email", pool] if provider == "claude" else [tool, "login"]
+    argv = [tool, "auth", "login", "--email", a.email] if provider == "claude" else [tool, "login"]
     if provider == "claude" and getattr(a, "sso", False):
         argv.append("--sso")
     print("bonsai: signing %s in as %s pool %s (a browser window opens)" % (provider, pool, d))
@@ -1518,13 +1520,19 @@ def resolve_target(target: str, cfg: dict, model: str | None) -> tuple[str, str 
     if t in models:
         prov, mid = models[t]
         return prov, None, model or mid
-    if t in ("claude", "codex"):
-        return t, None, model
-    for suffix in ("-claude", "-codex"):
-        if t.endswith(suffix):
-            return suffix[1:], t[: -len(suffix)], model
-    raise SystemExit("bonsai: unknown target %r. Try claude, codex, stanford-claude, stanford-codex, "
-                     "personal-codex, or a model alias (%s)" % (target, ", ".join(sorted(models))))
+    # The provider words people use: the company, the product and the CLI name all mean the same seat.
+    if t in PROVIDER_WORDS:
+        return PROVIDER_WORDS[t], None, model
+    for word, prov in PROVIDER_WORDS.items():
+        if t.endswith("-" + word) and len(t) > len(word) + 1:
+            return prov, t[: -len(word) - 1], model
+    raise SystemExit("bonsai: unknown target %r. Try claude, codex, stanford-claude, stanford-codex "
+                     "(also stanford-openai, stanford-chatgpt, stanford-anthropic), personal-codex, "
+                     "or a model alias (%s)" % (target, ", ".join(sorted(models))))
+
+
+PROVIDER_WORDS = {"claude": "claude", "anthropic": "claude",
+                  "codex": "codex", "openai": "codex", "chatgpt": "codex", "gpt": "codex"}
 
 
 def resolve_model(cfg: dict, provider: str, model: str | None) -> str:
@@ -1722,8 +1730,9 @@ Then:
 
 | The user says | Run |
 |---|---|
-| "route this to my stanford codex" / "run this on stanford chatgpt" | `bonsai job stanford-codex -f <files> -o <out> "<the task>"` |
-| "route this to my stanford claude" | `bonsai job stanford-claude -f <files> -o <out> "<the task>"` |
+| "route this to my stanford codex" / "stanford chatgpt" / "stanford openai" / "my stanford gpt" | `bonsai job stanford-codex -f <files> -o <out> "<the task>"` (`stanford-openai` and `stanford-chatgpt` are the same target) |
+| "route this to my stanford claude" / "stanford anthropic" | `bonsai job stanford-claude -f <files> -o <out> "<the task>"` (`stanford-anthropic` is the same target) |
+| "my stanford pro" / "the plus one" (two workspaces of one account, signed in as two pools) | the pool's own name from `bonsai doctor`: `bonsai job stanford-pro-codex ...` |
 | "ask astra" / "what does sol think" | `bonsai job astra -o <out> "<question>"` (or `sol`, `opus`, `sonnet`, `haiku`) |
 | "adversarial pass from astra on X" / "have sol try to break this" | `bonsai pass astra -f X -o X.pass-astra.md [--brief "<focus>"]` |
 | "...on stanford" added to any of the above | `bonsai pass astra@stanford -f X ...`, or `--pool stanford` |
@@ -1805,6 +1814,8 @@ def main(argv=None) -> int:
     g.add_argument("--codex", action="store_true")
     s.add_argument("--institution", action="store_true", help="a seat under your institution's agreements")
     s.add_argument("--name", help="short label for the board (default: personal, stanford, or the domain)")
+    s.add_argument("--pool", help="directory name for this sign-in when one e-mail has several workspaces "
+                                  "(default: the e-mail); pair it with --name, e.g. --pool stanford-pro --name stanford-pro")
     s.add_argument("--sso", action="store_true", help="(claude) force the SSO flow")
     s.add_argument("--acknowledge", action="store_true", help="you have read the institution notice (for scripts)")
     s.set_defaults(fn=cmd_login)
@@ -1831,7 +1842,8 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_run)
 
     def job_args(s):
-        s.add_argument("target", help="claude | codex | stanford-codex | personal-claude | astra | sol | opus | astra@stanford")
+        s.add_argument("target", help="claude | codex | stanford-codex (= stanford-openai, stanford-chatgpt) | "
+                                      "stanford-claude (= stanford-anthropic) | personal-claude | astra | sol | opus | astra@stanford")
         s.add_argument("-m", "--model", help="a model id or alias")
         s.add_argument("--effort", choices=["low", "medium", "high", "xhigh"])
         s.add_argument("--pool", help="override the login: a name or e-mail")
