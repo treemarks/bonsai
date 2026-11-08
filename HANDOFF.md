@@ -69,6 +69,19 @@ what each sign-in shows and what to pick, including the ChatGPT "Select a worksp
 Standard appears there as *Stanford University Plus (Edu)*; Pro as *Stanford University Pro (Edu)*)
 and the Claude page where you choose **Continue with SSO** for the Stanford account.
 
+**Don't have the Stanford accounts yet?** They are requested from Stanford, not created at
+claude.ai or chatgpt.com: [Claude for Education](https://uit.stanford.edu/service/claude) (Standard
+free; Premium paid, more quota and the Fable models) and
+[ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu) (Standard free, which is the
+*Plus (Edu)* workspace with Plus-level limits; Pro paid on a PTA or student account, the *Pro (Edu)*
+workspace with Pro-level limits; both include Codex). Request first, sign in once the invitation
+arrives. Claude Code knows this too: ask it "how do I get Stanford Codex" and it points you there.
+
+**No GitHub account needed.** The clone in `SETUP.md` §4 is an anonymous download; if someone
+hands you the folder instead, drop it at `~/code/bonsai` and skip the clone. Later, `bonsai update`
+(or "update bonsai" in Claude Code) pulls the newest version and says when to re-run
+`bonsai install-skill`.
+
 ## The steps
 
 1. Follow `SETUP.md` from the top: Command Line Tools, Claude Code, Codex, Bonsai, sign-ins. On a

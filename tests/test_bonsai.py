@@ -370,6 +370,33 @@ class Discovery(unittest.TestCase):
         finally:
             shutil.which, subprocess.call, sys.stdin, builtins.input = saved
 
+    def test_signup_hints_name_both_tiers(self):
+        lines = bonsai.signup_hints("x@stanford.edu")
+        self.assertEqual(len(lines), 2)
+        text = "\n".join(lines)
+        for needle in ("uit.stanford.edu/service/claude", "uit.stanford.edu/service/openai-chatgpt-edu",
+                       "Stanford University Plus (Edu)", "Stanford University Pro (Edu)", "Continue with SSO"):
+            self.assertIn(needle, text)
+        self.assertEqual(bonsai.signup_hints("x@nowhere.edu"), [])
+        self.assertEqual(bonsai.signup_hints(), lines)
+
+    def test_update_outside_a_checkout_says_so(self):
+        import argparse, io, contextlib
+        real = bonsai.repo_dir
+        bonsai.repo_dir = lambda: None
+        try:
+            with self.assertRaises(SystemExit) as cm:
+                bonsai.cmd_update(argparse.Namespace(dry_run=False), bonsai.load_config())
+            self.assertIn("not a git checkout", str(cm.exception))
+        finally:
+            bonsai.repo_dir = real
+        if real():  # running from the checkout: the dry run names the pull and spends nothing
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(bonsai.cmd_update(argparse.Namespace(dry_run=True), bonsai.load_config()), 0)
+            self.assertIn("git -C", out.getvalue())
+            self.assertIn("--ff-only", out.getvalue())
+
     def test_display_text_escapes_controls(self):
         self.assertEqual(bonsai.display_text("a\x1b[2Jb\n"), "a\\u001b[2Jb\\u000a")
         self.assertEqual(bonsai.display_text("plain", 3), "pla")

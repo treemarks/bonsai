@@ -72,7 +72,7 @@ MIN_USABLE_PCT = 10.0        # under this much room a login is held, not routed 
 DEFAULT_INTERVAL = 300       # seconds between probes; the floor is 180
 FILE_LIMIT = 400_000         # bytes of one -f file that go into a prompt
 PROMPT_LIMIT = 1_600_000     # bytes of the whole prompt
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 USER_AGENT = "bonsai/%s (+https://github.com/treemarks/bonsai)" % VERSION
 
 # How to get each tool on a machine that has nothing. `bonsai doctor` prints the line for
@@ -1376,6 +1376,10 @@ def cmd_doctor(a, cfg) -> int:
     if any(is_institution(cfg, p, prov) for prov, p, _ in pools):
         print("note: a job you ask a chat to run on an institution account is seen by that chat, under the chat's own"
               " account; the institution's protections do not extend to the chat (README, the box at the top).")
+    else:
+        print("no institution account yet. If you have one, SETUP.md §5c-5d signs it in; if not, here is where it comes from:")
+        for line in signup_hints():
+            print("  " + line)
     skill = os.path.join(HOME, ".claude", "skills", "bonsai-route", "SKILL.md")
     if os.path.isfile(skill):
         try:
@@ -1533,6 +1537,32 @@ def resolve_target(target: str, cfg: dict, model: str | None) -> tuple[str, str 
 
 PROVIDER_WORDS = {"claude": "claude", "anthropic": "claude",
                   "codex": "codex", "openai": "codex", "chatgpt": "codex", "gpt": "codex"}
+
+# Where a student gets the institution accounts, by e-mail domain. Printed by `doctor` when no
+# institution login exists, and carried by the skill so an agent can point the student there.
+INSTITUTION_SIGNUP = {
+    "stanford.edu": {
+        "name": "Stanford",
+        "claude": "Claude for Education: request it at https://uit.stanford.edu/service/claude (Standard is free with a "
+                  "SUNet ID; Premium, on a PTA or student account, adds quota and the Fable models). Then sign in at "
+                  "claude.ai with your @stanford.edu address and Continue with SSO.",
+        "codex": "ChatGPT Edu: request it at https://uit.stanford.edu/service/openai-chatgpt-edu. Standard is free "
+                 "and appears at sign-in as the workspace \"Stanford University Plus (Edu)\" (ChatGPT Plus-level "
+                 "limits); Pro is paid on a PTA or student account and appears as \"Stanford University Pro (Edu)\" "
+                 "(Pro-level limits). Both include Codex. Each sign-in binds to one workspace.",
+    },
+}
+
+
+def signup_hints(domain: str | None = None) -> list[str]:
+    """The sign-up lines for one domain, or for every known institution when none is given."""
+    out = []
+    for dom, e in INSTITUTION_SIGNUP.items():
+        if domain and not domain.lower().endswith(dom):
+            continue
+        out.append("%s Claude: %s" % (e["name"], e["claude"]))
+        out.append("%s ChatGPT/Codex: %s" % (e["name"], e["codex"]))
+    return out
 
 
 def resolve_model(cfg: dict, provider: str, model: str | None) -> str:
@@ -1739,6 +1769,36 @@ Then:
 | "use my personal account" | `bonsai job personal-codex ...` / `bonsai job personal-claude ...` |
 | "this has student data" / "patient records" / "confidential interviews" / "this is sensitive" | the rule above: explain and stop; never route |
 
+## When the user has no institution account yet
+
+If `bonsai doctor` shows no `⌂ institution` login, or the user asks how to get "Stanford Claude" /
+"Stanford ChatGPT" / "Stanford Codex", point them at the request pages; these accounts are
+requested from the university, not created at claude.ai or chatgpt.com:
+
+- Stanford Claude (Claude for Education): request at https://uit.stanford.edu/service/claude.
+  Standard is free with a SUNet ID; Premium (on a PTA or student account) adds quota and the Fable
+  models. Sign-in is at claude.ai with the @stanford.edu address and **Continue with SSO**.
+- Stanford ChatGPT / Codex (ChatGPT Edu): request at https://uit.stanford.edu/service/openai-chatgpt-edu.
+  Two tiers, which appear at Codex sign-in as two workspaces to choose between: **Stanford
+  University Plus (Edu)** is the free Standard tier (ChatGPT Plus-level limits); **Stanford
+  University Pro (Edu)** is the paid Pro tier (Pro-level limits, on a PTA or student account). Both
+  include Codex. A sign-in binds to one workspace; a second workspace is a second pool
+  (`bonsai login you@stanford.edu --codex --institution --pool stanford-pro --name stanford-pro`).
+- The invitation can take time; until the account exists on the web, `bonsai login` cannot sign it
+  in. Say so rather than retrying. `SETUP.md §5` is the screen-by-screen sign-in walk; tell the
+  user which step they are at (5a personal Claude, 5b personal ChatGPT, 5c Stanford Claude, 5d
+  Stanford ChatGPT).
+
+## Keeping Bonsai current
+
+- "update bonsai", or a `bonsai` message that a newer version exists: run `bonsai update` (a
+  fast-forward `git pull` of the checkout). If it prints that the skill may be older, run
+  `bonsai install-skill`; if that says **NOT UPDATED**, the installed skill was edited: show the
+  user the `.new` file it left and let them decide. `bonsai doctor` says whether the skill
+  matches the running version.
+- The CLIs update themselves (`claude update`; Codex says when a newer release exists). Bonsai
+  does not update them.
+
 - Write the task as a complete brief for a model that has no context but the prompt and the files
   passed with `-f`. `--cd <dir>` sets the working directory the model is told about.
 - Always pass `-o <file>` and read that file back to the user (for a pass, `<material>.pass-<alias>.md`).
@@ -1768,6 +1828,47 @@ def cmd_install_skill(a, cfg) -> int:
           "protected data; Bonsai does not detect protected information itself, and undeclared data is routed. If you\n"
           "will use Bonsai with university data, someone in your unit should review this file first (Stanford asks\n"
           "that of repeatable AI workflows and skills)." % path)
+    return 0
+
+
+def _self_dir() -> str:
+    """The folder this `bonsai` file lives in, with the symlink in ~/.local/bin resolved."""
+    return os.path.dirname(os.path.realpath(globals().get("__file__") or sys.argv[0] or "."))
+
+
+def repo_dir() -> str | None:
+    """The checkout this `bonsai` runs from, if it is a git work tree."""
+    here = _self_dir()
+    return here if os.path.isdir(os.path.join(here, ".git")) else None
+
+
+def cmd_update(a, cfg) -> int:
+    """Pull the checkout forward (fast-forward only) and say whether the installed skill still matches."""
+    d = repo_dir()
+    if not d:
+        raise SystemExit("bonsai: this copy is not a git checkout (%s); replace the folder with a newer one, or "
+                         "clone it: git clone https://github.com/treemarks/bonsai ~/code/bonsai" % _self_dir())
+    git = shutil.which("git")
+    if not git:
+        raise SystemExit("bonsai: git is not installed. " + INSTALL["git"]["windows" if IS_WIN else "darwin"])
+    before = VERSION
+    print("bonsai: updating %s (bonsai %s)" % (d, before))
+    sys.stdout.flush()
+    if a.dry_run:
+        print("would run: git -C %s pull --ff-only" % d)
+        return 0
+    rc = subprocess.call([git, "-C", d, "pull", "--ff-only"])
+    if rc != 0:
+        print("bonsai: git pull did not complete (exit %d). Local edits in the checkout? `git -C %s status`." % (rc, d),
+              file=sys.stderr)
+        return rc
+    r = subprocess.run([sys.executable, os.path.join(d, "bonsai"), "--version"], capture_output=True, text=True)
+    after = (r.stdout.strip().split() or ["?", "?"])[-1]
+    print("bonsai: %s -> %s" % (before, after) if after != before else "bonsai: already %s" % before)
+    skill = os.path.join(HOME, ".claude", "skills", "bonsai-route", "SKILL.md")
+    if os.path.isfile(skill) and after != before:
+        print("bonsai: the skill Claude Code uses may be older than this version: run `bonsai install-skill` "
+              "(it refuses to overwrite a skill you edited and leaves a .new file instead).")
     return 0
 
 
@@ -1872,6 +1973,10 @@ def main(argv=None) -> int:
 
     s = parser("install-skill", help="teach Claude Code the routing words")
     s.set_defaults(fn=cmd_install_skill)
+
+    s = parser("update", help="pull the newest Bonsai into this checkout (git pull --ff-only) and check the skill")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_update)
 
     s = parser("config", help="show or set config: bonsai config --set 'models.astra=[\"codex\",\"gpt-6-astra\"]'")
     s.add_argument("--set", action="append")

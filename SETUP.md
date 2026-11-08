@@ -99,6 +99,12 @@ export PATH="$HOME/.local/bin:$PATH"
 bonsai doctor
 ```
 
+No GitHub account is involved: the clone is an anonymous download over HTTPS, and nothing in
+Bonsai talks to GitHub afterwards except `bonsai update`, which is the same download again. If you
+were handed the folder instead (a zip, AirDrop, a USB stick), put it at `~/code/bonsai` and run the
+lines from `mkdir` on; `bonsai update` then tells you it is not a checkout, and a newer folder
+replaces the old one the same way.
+
 `bonsai doctor` lists what is installed and which logins it can see, prints the install line for
 anything missing, and exits non-zero until `git`, `claude` and `codex` all answer. Exit 0 means
 the three tools answered their version checks, nothing more: read the login lines yourself. Before
@@ -111,13 +117,28 @@ shape: a command in Terminal, a page that opens in your browser, and Terminal no
 page is done. Nothing is typed into Terminal except the commands shown (and, once, `I understand`).
 You never type a password into Terminal; passwords go only into the browser pages.
 
-**Before you start.** Each account must already exist: a personal Claude or ChatGPT account you
-can sign in to on the web, and, for Stanford, an account that Stanford has provisioned. Stanford's
-seats are requested, not self-served: [Claude for Education](https://uit.stanford.edu/service/claude)
-(Standard is free with a SUNet ID) and [ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu)
-(Standard free; Pro on a PTA or student account), each through its request form on that page. If you
-cannot sign in to `claude.ai` or `chatgpt.com` with the account in a normal browser tab, the CLI
-cannot sign in with it either; sort that out first.
+**Before you start: the accounts must exist.** A personal Claude or ChatGPT account you can sign
+in to on the web, and, for Stanford, accounts that Stanford has provisioned. Stanford's seats are
+requested from the university, not created at claude.ai or chatgpt.com; if you have not requested
+them yet, do that first, and expect the invitation to take a little time:
+
+- **Stanford Claude** (Claude for Education): request it at
+  [uit.stanford.edu/service/claude](https://uit.stanford.edu/service/claude). *Standard* is free to
+  anyone with a SUNet ID; *Premium* (paid, on a PTA or student account) adds quota and the Fable
+  models. Once it exists you sign in at claude.ai with your `@stanford.edu` address and **Continue
+  with SSO**.
+- **Stanford ChatGPT, which includes Codex** (ChatGPT Edu): request it at
+  [uit.stanford.edu/service/openai-chatgpt-edu](https://uit.stanford.edu/service/openai-chatgpt-edu).
+  Two tiers, and they are two separate workspaces you will see side by side at sign-in: **Stanford
+  University Plus (Edu)** is the free *Standard* tier, with ChatGPT Plus-level usage limits;
+  **Stanford University Pro (Edu)** is the paid *Pro* tier (PTA or student account), with Pro-level
+  limits. Both include Codex. Most students have Plus. A sign-in binds to one of them; if you have
+  both and want both on the board, step 5d shows the second sign-in.
+- Stanford's own pages, not Bonsai, say what each account is approved for; `bonsai doctor` prints
+  these two pointers whenever no institution login is set up.
+
+If you cannot sign in to `claude.ai` or `chatgpt.com` with an account in a normal browser tab, the
+CLI cannot sign in with it either; sort that out first.
 
 **Which account is which.** On a MacBook with a personal Claude Pro and two Stanford seats you
 will do four sign-ins: personal Claude (step 5a), personal ChatGPT if you have one (5b), Stanford
@@ -131,18 +152,20 @@ may skip straight to a choice of accounts or workspaces: choose the one the step
 claude
 ```
 
-1. The first run asks a few setup questions in Terminal (a colour theme and the like): press
-   Return to accept each default.
-2. At the login question, choose the **Claude account with subscription** option (your Pro, Max,
-   Team or Education account on claude.ai), not *Anthropic Console* (API billing) and not
-   *3rd-party platform*. Move with the arrow keys, confirm with Return.
+1. The first run asks **Choose the text style that looks best with your terminal**: press Return
+   to accept the default.
+2. **Select login method:** lists **Claude account with subscription**, **Anthropic Console
+   account** and **3rd-party platform**. Choose the first (your Pro, Max, Team or Education account
+   on claude.ai); Console is API billing and 3rd-party is for cloud providers. Move with the arrow
+   keys, confirm with Return.
 3. Your browser opens on claude.ai. Sign in with your personal account (the one you use at
    claude.ai), then approve the request to let Claude Code use it. If the browser does not open,
    press `c` in Terminal to copy the link and paste it into a browser yourself.
 4. Two endings are normal: the browser says you can close the tab and Terminal shows
-   `Login successful`; or the browser shows a code instead, which you paste into Terminal at
-   `Paste code here if prompted`, then Return.
-5. Press Return when Terminal asks, then type `/exit` and Return to leave Claude Code.
+   **Login successful. Press enter to continue**; or the browser shows a code instead, which you
+   paste into Terminal at **Paste code here if prompted >**, then Return.
+5. Press Return, answer any remaining setup question with Return, then type `/exit` and Return to
+   leave Claude Code.
 
 Check: `claude auth status` prints a block of lines; `"loggedIn": true` and your e-mail should be
 among them.
@@ -153,15 +176,19 @@ among them.
 codex
 ```
 
-1. The first screen offers **Sign in with ChatGPT** (first option) and *Provide your own API
-   key*. Press Return on **Sign in with ChatGPT**. (A third option, *Sign in with Device Code*, is
-   for a machine with no browser; you do not need it.)
+1. The first screen, **Choose how you want to use Codex.**, lists **Sign in with ChatGPT**
+   ("Usage included with Plus, Pro, Business, and Enterprise plans"), **Sign in with Device Code**
+   ("Sign in from another device with a one-time code"), **Provide your own API key** ("Pay for
+   what you use") and **Use Amazon Bedrock**. Press Return on the first. (Device Code is the
+   fallback described below; the API-key and Bedrock options bill separately and are not what you
+   want.)
 2. Your browser opens on OpenAI's sign-in. Sign in with your personal ChatGPT account.
 3. If that account belongs to more than one workspace, the page says **Select a workspace** and
    lists them, each with a small building or person icon. For this step choose your *personal*
    workspace, not a Stanford one, then **Continue**.
-4. The browser says you are signed in and can return to the terminal; Terminal shows the Codex
-   prompt. Press Ctrl-C (hold Control, press C) once or twice to leave Codex.
+4. The browser says you are signed in and can return to the terminal; Terminal shows
+   **Successfully logged in.** and **Press Enter to continue.** Press Return, then Ctrl-C (hold
+   Control, press C) once or twice to leave Codex.
 
 Check: `codex login status` prints `Logged in using ChatGPT`.
 
@@ -278,11 +305,15 @@ Run the tests any time: `/usr/bin/python3 -m unittest discover -s ~/code/bonsai/
 ## Updating
 
 ```bash
-cd ~/code/bonsai && git pull
+bonsai update
 ```
 
-The CLIs update themselves (`claude update`; `codex` tells you when a newer release exists; the
-release-binary install in step 3 can be run again).
+That is a fast-forward `git pull` of the checkout; it prints the old and new version, and tells
+you to run `bonsai install-skill` when the skill Claude Code uses is older than the new version
+(the skill install never overwrites a skill you edited; it leaves a `.new` file). Claude Code
+knows this too: "update bonsai" in a session runs the same thing. The CLIs update themselves
+(`claude update`; `codex` tells you when a newer release exists; the release-binary install in
+step 3 can be run again).
 
 ## Windows (later)
 
