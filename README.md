@@ -20,7 +20,7 @@ work an adversarial pass**, or **turn a file into a plan**. Here's what that loo
 
 ### 2. Ask for an adversarial pass
 
-<img src="docs/images/use-case-2-homework.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
+<img src="docs/images/use-case-2-homework-corrected.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
 
 ### 3. Turn a file into a plan
 
