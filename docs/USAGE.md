@@ -4,23 +4,13 @@
 
 ## The board
 
-<img src="images/pool-gauge.png" alt="Dark pool gauge rendered from recorded local usage with anonymized account labels" width="800">
+<img src="images/pool-gauge.png" alt="Three-account Bonsai gauge example: personal Claude, institution Claude and institution ChatGPT, with usage, reset windows and machine load." width="800">
+
+Three-account example, rendered by Bonsai.
 
 ```
 bonsai gauge          # live; q quits
 bonsai gauge --once   # one frame, for a script or a screenshot
-```
-
-```
-ACCOUNTS   ant = Claude   oai = Codex   ⌂ = institution seat           as of 2m ago   refresh in 3m
-  LOGIN       VIA                          %LEFT RESET   5H    RESET   PLAN     STATE
-  ⌂stanford   oai ████████████████████░░░░ 83%   2d13h   100%  ·       edu      ok
-  ⌂stanford   ant ························ ·     ·       ·     ·       enterpr  signed-in
-   personal   oai ███████████████░░░░░░░░░ 62%   6d4h    100%  ·       plus     ok
-   personal   ant ························ ·     ·       ·     ·       pro      signed-in
-
-MACHINE    ACTIVITY                 LOAD   MEM%   SWAP   BATT      UP
-  air        job×1 pass:astra        0.8    61%    1GB    84% batt  3d2h    last: astra ok 14m ago
 ```
 
 Rows sort by the weekly reset that comes soonest, because that room is the most perishable:
@@ -112,6 +102,11 @@ with the quoted claim, why it fails, a confidence and what would settle it; then
 one-paragraph verdict. No praise, no rewriting. The brief and the material travel as a JSON object
 so neither can pretend to be the instructions. Use a different model family from the one that
 wrote the draft.
+
+To return a corrected draft after the review, ask your agent for a follow-up job with the draft
+and the findings. `-o` saves the model's text reply as a file. For a design handoff, send the
+specification in a job and ask for a concept plan in Markdown, HTML or SVG. HTML and SVG
+can include a visual plan preview.
 
 ### Any command, under a login
 

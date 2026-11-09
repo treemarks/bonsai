@@ -10,7 +10,7 @@ already have. Most of us default to personal logins and don't take advantage of 
 [ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu).
 
 After setup, you can ask in natural language to **have models debate a question**, **give your
-work an adversarial pass**, or **send a request to another account**. Here's what that looks like.
+work an adversarial pass**, or **turn a file into a plan**. Here's what that looks like.
 
 ### 1. Have the models debate a question
 
@@ -20,18 +20,18 @@ work an adversarial pass**, or **send a request to another account**. Here's wha
 
 ### 2. Ask for an adversarial pass
 
-<img src="docs/images/use-case-2-homework.png" alt="hey thanks for the help on my LCA homework, can u send it to chatgpt for an adversarial pass before we turn it in? The agent asks ChatGPT to challenge the reasoning and point out what needs another look." width="640">
+<img src="docs/images/use-case-2-homework.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
 
-### 3. Use another account
+### 3. Turn a file into a plan
 
-<img src="docs/images/use-case-3-routing.png" alt="can you route this conversation to my Stanford Claude? The agent sends the relevant context and next question to that account, then brings the reply back here." width="640">
+<img src="docs/images/use-case-3-architecture.png" alt="Illustrative design handoff: Claude provides a design-specification file. You ask ChatGPT for architectural plans based on it, and the reply includes a document with a concept-plan preview." width="640">
 
 <details>
 <summary>See the pool gauge</summary>
 
-<img src="docs/images/pool-gauge.png" alt="Bonsai pool gauge in dark mode, rendered from real recorded local usage. It shows account usage bars, reset windows and machine load; account names are anonymized." width="800">
+<img src="docs/images/pool-gauge.png" alt="Three-account Bonsai gauge example showing personal Claude, institution Claude and institution ChatGPT, with usage, reset windows and machine load." width="800">
 
-Rendered from recorded local usage, with account labels anonymized. [How to read the board](docs/USAGE.md#the-board).
+Three-account example, rendered by Bonsai. [How to read the board](docs/USAGE.md#the-board).
 
 </details>
 
