@@ -50,7 +50,7 @@ setup on your Mac; a regular Claude chat can walk you through it.
 Your original chat can still see routed tasks and replies. For protected information, use your
 institution's approved tools directly. [More about accounts and data](docs/ACCOUNTS.md).
 
-**_Currently only tested on Mac OS. Looking for testers for Windows, please let me know!_**
+**_Currently only tested on Mac OS. Looking for testers for Windows, please let us know your results if you try it!_**
 
 ---
 
