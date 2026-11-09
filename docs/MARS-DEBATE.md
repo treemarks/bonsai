@@ -23,3 +23,15 @@ there was no final Claude reply or agreed conclusion. The dates are the models' 
 not NASA or SpaceX mission schedules.
 
 The README's NASA–SpaceX artwork is an imagined editorial illustration.
+
+## A new closing line
+
+After reviewing the debate, the reader proposed:
+
+> ok i pick 2043 because youre right we need to prove that people can come back.
+
+This is a new closing response, not an additional model reply from the original trial.
+
+## Illustration
+
+<img src="images/mars-race.png" alt="An imagined NASA and SpaceX race toward Mars" width="640">

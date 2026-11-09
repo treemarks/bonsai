@@ -14,9 +14,11 @@ work an adversarial pass**, or **send a request to another account**. Here's wha
 
 ### 1. Have the models debate a question
 
-<img src="docs/images/use-case-1-mars.png" alt="Example request: claude, when do you think we're gonna get to Mars? can you debate this with ChatGPT? In a real Bonsai trial, Codex forecast 2042, Claude chose 2044 and questioned return readiness, and Codex became less confident about its deadline." width="640">
+> claude, when do you think we’re gonna get to Mars? can you debate this with ChatGPT?
 
-[Read the Mars exchange](docs/MARS-DEBATE.md), condensed from a real trial. These are forecasts, not mission dates.
+<img src="docs/images/use-case-1-mars.png" alt="Rendered excerpts of saved Bonsai output, with Claude first questioning return readiness and your new closing line: ok i pick 2043 because youre right we need to prove that people can come back." width="640">
+
+[Read the Mars exchange and see the illustration](docs/MARS-DEBATE.md). The panel renders saved output; the dates are forecasts, not mission schedules.
 
 ### 2. Ask for an adversarial pass
 
@@ -25,6 +27,15 @@ work an adversarial pass**, or **send a request to another account**. Here's wha
 ### 3. Use another account
 
 <img src="docs/images/use-case-3-routing.png" alt="can you route this conversation to my Stanford Claude? The agent sends the relevant context and next question to that account, then brings the reply back here." width="640">
+
+<details>
+<summary>See the router’s output</summary>
+
+<img src="docs/images/router-output.png" alt="Actual Bonsai route codex output rendered in monochrome. It ranks eligible accounts by their usage windows; account labels are anonymized." width="800">
+
+Recorded local usage, with account labels anonymized. [How routing works](docs/USAGE.md#routing).
+
+</details>
 
 ## Get started
 

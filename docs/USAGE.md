@@ -37,6 +37,10 @@ renders from the cache in between. `--fresh` probes now.
 
 ## Routing
 
+<img src="images/router-output.png" alt="Rendered output of the actual Bonsai router using cached local usage, with anonymized account labels" width="800">
+
+The image above renders recorded local output; it is not a native app screenshot.
+
 ```bash
 bonsai route                  # both providers: the order for general work and for sensitive work
 bonsai route codex --fresh    # one provider, probe now
