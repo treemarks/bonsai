@@ -14,24 +14,31 @@ work an adversarial pass**, or **turn a file into a plan**. Here's what that loo
 
 ### 1. Have the models debate a question
 
-<img src="docs/images/use-case-1-mars.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. You conclude: ok, i pick 2043 because you’re right—we need to prove that people can come back." width="640">
+<img src="docs/images/use-case-1-mars-compact.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. You conclude: ok, i pick 2043 because you’re right—we need to prove that people can come back." width="640">
 
-[Read the Mars exchange](docs/MARS-DEBATE.md). The illustrated example uses condensed trial excerpts and your new closing line.
+[Adapted from a recorded Mars debate](docs/MARS-DEBATE.md).
 
 ### 2. Ask for an adversarial pass
 
-<img src="docs/images/use-case-2-homework-corrected.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
+<img src="docs/images/use-case-2-homework-compact.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
 
 ### 3. Turn a file into a plan
 
-<img src="docs/images/use-case-3-architecture.png" alt="Illustrative design handoff: Claude provides a design-specification file. You ask ChatGPT for architectural plans based on it, and the reply includes a document with a concept-plan preview." width="640">
+<img src="docs/images/use-case-3-architecture-compact.png" alt="Illustrative design handoff: Claude provides a design-specification file. You ask ChatGPT for architectural plans based on it, and the reply includes a document with a concept-plan preview." width="640">
+
+<details>
+<summary>Another way to use it: make a draft concise</summary>
+
+<img src="docs/images/use-case-3-concise-compact.png" alt="Hypothetical conversation: Claude’s detailed garden invitation grows progressively smaller in type; you ask ChatGPT to make it concise, and it returns one short, welcoming invitation." width="640">
+
+</details>
 
 <details>
 <summary>See the pool gauge</summary>
 
-<img src="docs/images/pool-gauge.png" alt="Three-account Bonsai gauge example showing personal Claude, institution Claude and institution ChatGPT, with usage, reset windows and machine load." width="800">
+<img src="docs/images/pool-gauge-student-bars.png" alt="Example Bonsai gauge with colored usage bars for personal Claude, Stanford Claude and Stanford ChatGPT; all usage figures are sample data." width="800">
 
-Three-account example, rendered by Bonsai. [How to read the board](docs/USAGE.md#the-board).
+Example setup with sample usage; Claude usage reads enabled. [How to read the board](docs/USAGE.md#the-board).
 
 </details>
 
@@ -47,5 +54,6 @@ institution's approved tools directly. [More about accounts and data](docs/ACCOU
 
 ---
 
-Made by [Treemarks](https://treemarks.ai). Independent of Stanford, Anthropic and OpenAI.
+Made by [Treemarks](https://treemarks.ai). Not affiliated with or endorsed by Stanford, Anthropic or OpenAI.
+Claude and ChatGPT are trademarks of their respective owners.
 [Manual setup](docs/INSTALL.md) · [Development](docs/DEVELOPMENT.md) · [MIT license](LICENSE)

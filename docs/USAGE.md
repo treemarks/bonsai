@@ -4,9 +4,9 @@
 
 ## The board
 
-<img src="images/pool-gauge.png" alt="Three-account Bonsai gauge example: personal Claude, institution Claude and institution ChatGPT, with usage, reset windows and machine load." width="800">
+<img src="images/pool-gauge-student-bars.png" alt="Three-account Bonsai gauge example: personal Claude, institution Claude and institution ChatGPT, with usage, reset windows and machine load." width="800">
 
-Three-account example, rendered by Bonsai.
+Example setup with sample usage; Claude usage reads enabled.
 
 ```
 bonsai gauge          # live; q quits
@@ -106,7 +106,8 @@ wrote the draft.
 To return a corrected draft after the review, ask your agent for a follow-up job with the draft
 and the findings. `-o` saves the model's text reply as a file. For a design handoff, send the
 specification in a job and ask for a concept plan in Markdown, HTML or SVG. HTML and SVG
-can include a visual plan preview.
+can include a visual plan preview. The README’s studio rendering is illustrative artwork;
+image generation requires a tool available to your agent.
 
 ### Any command, under a login
 
