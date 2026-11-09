@@ -91,7 +91,7 @@ sentence is "the same account and tool Stanford approved, driven headless by you
 
 ## The author's fallback, if the premise fails
 
-Sean, 2026-11-08: "if what I'm asking for is impossible, then the agent should at some point
+Ruled 2026-11-08: "if what I'm asking for is impossible, then the agent should at some point
 remind the user upon setup that coordinating the Stanford pools removes the protection against
 PHI and PII, and if they want to send private data they need to log in to those directly."
 

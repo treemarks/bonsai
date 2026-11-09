@@ -2,7 +2,7 @@
 
 [Back to Bonsai](../README.md)
 
-A short excerpt from Sean's November 8, 2026 Bonsai trial. Codex took a position on the first
+A short excerpt from a November 8, 2026 Bonsai trial. Codex took a position on the first
 human landing and asked Claude Opus to challenge it through Bonsai. The exchange below was
 condensed in the original chat; it is not a verbatim transcript of the model calls.
 
