@@ -17,8 +17,6 @@ Here's what that looks like.
 
 <img src="docs/images/use-case-1-mars-blog.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. Claude says 2042 is too soon before proving people can get home. You conclude: ok i pick 2043. please update my blog post!" width="640">
 
-[Adapted from a recorded Mars debate](docs/MARS-DEBATE.md).
-
 ### 2. Ask for an adversarial pass
 
 <img src="docs/images/use-case-2-homework-compact.png" alt="Illustrative LCA homework review: ChatGPT spots that Claude counted combustion instead of the total fuel cycle. A follow-up correction returns the revised homework as an attachment." width="640">
