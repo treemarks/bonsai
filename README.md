@@ -1,4 +1,62 @@
+<img src="docs/images/bonsai.svg" alt="A little green bonsai in a terracotta pot" width="120">
+
 # Bonsai — a little Treemarks
+
+Bonsai is a **model and account router** intended to help you make better use of the AI accounts
+you already have.
+
+Most of us default to our personal logins and don't take advantage of Stanford's
+[Claude for Education](https://uit.stanford.edu/service/claude) and
+[ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu). After setup, you can ask your
+coding agent in natural language to route jobs to those accounts, including sending longer
+calls there as it works, so your personal plan's allowance can last longer. Your agent chooses
+which calls to send; use each account for work its terms allow.
+
+You can also have the models give your work an **adversarial pass**, or debate each other so you
+can see where they disagree. Here are three ways you might use it.
+
+### 1. Let them debate it
+
+> hey, can you and ChatGPT debate this Mars idea? i want to see where you actually disagree.
+
+Your chat can send the argument to another model, bring back its objections, and ask for a reply.
+You get to follow the disagreement, question an assumption, or stop when you have enough to
+think with. Bonsai handles each call; the chat you're working in carries the conversation
+between models. There is no separate debate command.
+
+<img src="docs/images/use-case-1-mars.png" alt="Illustrative Mars debate: ask another model to challenge the idea, then compare the arguments." width="640">
+
+### 2. Give my homework a tough second look
+
+> hey, i drafted this answer to LCA homework, HW n part 3. send it to ChatGPT and ask for an
+> adversarial pass.
+
+An **adversarial pass** asks another model to look for holes: a shaky assumption, a missing step,
+a conclusion your evidence doesn't support. It points to what deserves another look, so you can
+revise your own answer. Include the question and your draft; the review is only as useful as the
+context you give it.
+
+<img src="docs/images/use-case-2-homework.png" alt="Illustrative homework review: send an LCA draft to ChatGPT for a critical second look." width="640">
+
+### 3. Help me keep building
+
+> i'm running out of tokens and i want to build this Christmas app for my son. could you please
+> send long model calls to my Stanford Claude seat where possible?
+
+You can ask your chat to send substantial planning or code-generation calls to the account you
+name, where that account permits the work. Claude returns an answer or code for your chat to
+review and apply. Your chat chooses which calls to send; Bonsai doesn't automatically detect
+long calls or move a stopped job to another account. Each account keeps its own limits.
+
+<img src="docs/images/use-case-3-christmas.png" alt="Illustrative Christmas app request: ask the current chat to send suitable long calls to a named Stanford Claude seat." width="640">
+
+*These are illustrative conversations, not captured sessions or a separate Bonsai chat interface.
+The natural-language requests work through your coding agent after setup; the commands below
+also work directly in Terminal.*
+
+[Get set up](SETUP.md) · [See your accounts](#the-board) · [Ask for a second look](#adversarial-passes)
+
+## How it works
 
 **One board for every AI login on your Mac — your personal Claude or ChatGPT and your
 institution's seats — and one command that runs a job on the one you name.**
