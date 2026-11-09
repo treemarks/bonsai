@@ -4,6 +4,8 @@
 
 ## The board
 
+<img src="images/pool-gauge.png" alt="Dark pool gauge rendered from recorded local usage with anonymized account labels" width="800">
+
 ```
 bonsai gauge          # live; q quits
 bonsai gauge --once   # one frame, for a script or a screenshot
@@ -36,10 +38,6 @@ a lock so a second window or a script waits for the first probe instead of addin
 renders from the cache in between. `--fresh` probes now.
 
 ## Routing
-
-<img src="images/router-output.png" alt="Rendered output of the actual Bonsai router using cached local usage, with anonymized account labels" width="800">
-
-The image above renders recorded local output; it is not a native app screenshot.
 
 ```bash
 bonsai route                  # both providers: the order for general work and for sensitive work

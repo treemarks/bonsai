@@ -1,11 +1,12 @@
-# Handoff: Bonsai on a MacBook Air with a personal Claude Pro and two Stanford seats
+# Handoff: Bonsai on a Mac with one personal plan and an institution's seats
 
-For the friend this was built for. Paste this file and `SETUP.md` to Claude Code (or read them
-yourself); either way the steps are the same.
+For whoever is setting Bonsai up on their own machine; Stanford is the worked example
+institution. Paste this file and `SETUP.md` to Claude Code (or read them yourself); either way
+the steps are the same.
 
 ## First, the one thing to know
 
-When you ask the chat you are in — Claude Code, on your personal Pro account — to run a job on
+When you ask the chat you are in — Claude Code, on your personal account — to run a job on
 your Stanford Claude or Stanford Codex account, that chat can see the task and the results, and
 handles them under your personal account and its settings. Choosing the Stanford account for the
 job does not give your personal chat Stanford's protections.
@@ -45,11 +46,11 @@ chat.)
   `bonsai` command, and "this has student data" makes it stop and tell you to use Stanford's tools
   directly instead.
 
-## Your three logins, as pools
+## Your logins, as pools
 
 | You say | The login | Bonsai's name for it | How it gets there |
 |---|---|---|---|
-| "my Claude" | personal Claude Pro | `personal` (ant) | already there once `claude` is signed in |
+| "my Claude" | personal Claude | `personal` (ant) | already there once `claude` is signed in |
 | "my Stanford Claude" / "my Stanford Anthropic" | Claude for Education seat | `stanford` (ant) ⌂ | `bonsai login you@stanford.edu --claude --institution` |
 | "my Stanford Codex" / "Stanford ChatGPT" / "Stanford OpenAI" | ChatGPT Edu seat | `stanford` (oai) ⌂ | `bonsai login you@stanford.edu --codex --institution` |
 
@@ -60,7 +61,7 @@ need to know which CLI serves which; say the company or the product and Bonsai p
 The `⌂` means "marked institution by you": `auto` routing uses such an account only for
 `--kind sensitive` work and never for everyday jobs; a named target (`stanford-codex`) always
 means that account. The mark does not verify that you picked the Stanford workspace at sign-in
-(check what `bonsai doctor` shows) and does not mean approval for any data. Your personal Pro
+(check what `bonsai doctor` shows) and does not mean approval for any data. Your personal account
 carries everyday work. If you add a personal ChatGPT login later (`codex`, sign in), it joins the
 board as `personal` (oai).
 

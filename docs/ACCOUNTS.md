@@ -91,6 +91,10 @@ Stanford appears here as an example institutional configuration, with links to i
 Each login is yours under its provider's terms, and an institution seat is yours under your
 institution's agreement as well. Read them; Bonsai cannot read them for you.
 
+Bonsai is for one person's own accounts on one machine, each used under its vendor's terms.
+It is not for pooling other people's logins, sharing an account, or routing anyone else's
+requests through your plan.
+
 - Anthropic: [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) (personal plans),
   [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) (Team, Enterprise and
   Education organizations), [Usage Policy](https://www.anthropic.com/legal/aup), and Claude

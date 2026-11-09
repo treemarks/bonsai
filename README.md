@@ -14,11 +14,9 @@ work an adversarial pass**, or **send a request to another account**. Here's wha
 
 ### 1. Have the models debate a question
 
-> claude, when do you think we’re gonna get to Mars? can you debate this with ChatGPT?
+<img src="docs/images/use-case-1-mars.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. You conclude: ok, i pick 2043 because you’re right—we need to prove that people can come back." width="640">
 
-<img src="docs/images/use-case-1-mars.png" alt="Rendered excerpts of saved Bonsai output, with Claude first questioning return readiness and your new closing line: ok i pick 2043 because youre right we need to prove that people can come back." width="640">
-
-[Read the Mars exchange and see the illustration](docs/MARS-DEBATE.md). The panel renders saved output; the dates are forecasts, not mission schedules.
+[Read the Mars exchange](docs/MARS-DEBATE.md). The illustrated example uses condensed trial excerpts and your new closing line.
 
 ### 2. Ask for an adversarial pass
 
@@ -29,11 +27,11 @@ work an adversarial pass**, or **send a request to another account**. Here's wha
 <img src="docs/images/use-case-3-routing.png" alt="can you route this conversation to my Stanford Claude? The agent sends the relevant context and next question to that account, then brings the reply back here." width="640">
 
 <details>
-<summary>See the router’s output</summary>
+<summary>See the pool gauge</summary>
 
-<img src="docs/images/router-output.png" alt="Actual Bonsai route codex output rendered in monochrome. It ranks eligible accounts by their usage windows; account labels are anonymized." width="800">
+<img src="docs/images/pool-gauge.png" alt="Bonsai pool gauge in dark mode, rendered from real recorded local usage. It shows account usage bars, reset windows and machine load; account names are anonymized." width="800">
 
-Recorded local usage, with account labels anonymized. [How routing works](docs/USAGE.md#routing).
+Rendered from recorded local usage, with account labels anonymized. [How to read the board](docs/USAGE.md#the-board).
 
 </details>
 

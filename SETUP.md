@@ -176,9 +176,10 @@ If you cannot sign in to `claude.ai` or `chatgpt.com` with an account in a norma
 CLI cannot sign in with it either; sort that out first (web access shows the account exists, not
 that the CLI is entitled; that is the sign-in's job to find out).
 
-**Which account is which.** On a MacBook with a personal Claude Pro and two Stanford seats you
-will do four sign-ins: personal Claude (step 5a), personal ChatGPT if you have one (5b), Stanford
-Claude (5c), Stanford ChatGPT (5d). Each browser page asks you to sign in; use the account that
+**Which account is which.** On a Mac with one personal plan and an institution's seats (Stanford
+in this walkthrough) you will do up to four sign-ins: personal Claude (step 5a), personal ChatGPT
+if you have one (5b), Stanford Claude (5c), Stanford ChatGPT (5d); skip a step whose account you
+do not have. Each browser page asks you to sign in; use the account that
 step names, and if the browser is already signed in to another account on that site, the page
 may skip straight to a choice of accounts or workspaces: choose the one the step names.
 

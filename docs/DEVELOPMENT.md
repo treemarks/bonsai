@@ -11,6 +11,6 @@ BONSAI_POOLS_HOME=/tmp/fakehome BONSAI_STATE=/tmp/bonsai-state ./bonsai gauge --
 `BONSAI_POOLS_HOME` points discovery at another home (the tests use a synthetic one);
 `BONSAI_STATE` and `BONSAI_CONFIG` move the cache and config. Standard library only; one file.
 `review/` holds the terms digest, the briefs of the five adversarial passes this release was
-checked against, and the tests they produced. Bonsai is MIT-licensed. It began as a handoff for a
-friend with a MacBook Air, a personal Claude Pro and two Stanford seats, who wanted the Treemarks
+checked against, and the tests they produced. Bonsai is MIT-licensed. It began as a handoff for
+someone with one Mac, one personal plan and an institution's seats, who wanted the Treemarks
 pool gauge in miniature.
