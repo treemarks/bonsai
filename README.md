@@ -50,7 +50,8 @@ setup on your Mac; a regular Claude chat can walk you through it.
 Your original chat can still see routed tasks and replies. For protected information, use your
 institution's approved tools directly. [More about accounts and data](docs/ACCOUNTS.md).
 
-_Currently tested on Mac. Will validate Windows soon!_
+**_Currently only tested on Mac OS. Looking for testers for Windows, please let me know!_**
+
 ---
 
 Made by [Treemarks](https://treemarks.ai). Not affiliated with or endorsed by Stanford, Anthropic or OpenAI.
