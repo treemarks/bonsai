@@ -36,7 +36,7 @@ chat.)
   Codex, and personal ChatGPT if you sign that in — showing how much of each week's and each
   five-hour window is left, when each resets, and your Air's own load on the row beneath. It is the
   Treemarks pool gauge in miniature. (Claude rows show the plan and `signed-in` rather than
-  percentages unless you turn Claude usage reads on; the README says why.)
+  percentages unless you turn Claude usage reads on; [the usage guide](docs/USAGE.md#the-board) says why.)
 - Routing: `bonsai job stanford-codex ...` runs a job on that seat; `bonsai job astra ...` or
   `sol ...` runs on whichever personal login has the most perishable room; `bonsai pass astra -f
   draft.md` has a second model try to break your draft.
@@ -123,12 +123,12 @@ after `install-skill`; read it once, and edit it if you use different words.
 ## Where the lines are
 
 - Stanford classifies data as Low, Moderate or High Risk and says which tools are approved for
-  which; the Claude for Education page and the June 30 notice are linked from the README. Bonsai
+  which; the Claude for Education page and the June 30 notice are linked from [Accounts & data](docs/ACCOUNTS.md#terms-of-use). Bonsai
   routes; it does not decide what may go where, and a routed job never gets the seat's protections
   for the chat that asked.
 - Everything is your own logins on your own Mac. Don't copy a pool folder anywhere.
 - The usage numbers come from the CLIs themselves (Codex's own app-server; Claude's `auth status`).
-  Bonsai reads a stored Claude token only if you turn that on, and the README says what Anthropic's
+  Bonsai reads a stored Claude token only if you turn that on, and [Accounts & data](docs/ACCOUNTS.md#what-bonsai-reads-and-what-it-never-does) says what Anthropic's
   terms say about that.
 
 ## If something is off

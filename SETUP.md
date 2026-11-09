@@ -377,7 +377,7 @@ Run the tests any time: `/usr/bin/python3 -m unittest discover -s ~/code/bonsai/
 ## If the board says...
 
 - `signed-in` on a Claude row with no numbers: normal. Bonsai does not read Claude's usage unless
-  you turn that on (README §What Bonsai reads); it shows the login's plan from Claude Code itself.
+  you turn that on ([details](docs/ACCOUNTS.md#what-bonsai-reads-and-what-it-never-does)); it shows the login's plan from Claude Code itself.
   It confirms the sign-in only; it does not measure remaining usage or certify any data approval.
 - `re-login`: the sign-in lapsed; run the same `bonsai login` line (or `claude` / `codex`) again.
 - `locked` or `keychain-timeout` (only with Claude usage reads on): the credential could not be
