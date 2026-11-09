@@ -7,7 +7,7 @@
 Bonsai is a **model and account router** that helps you make better use of the AI accounts you
 already have. Most of us default to personal logins and don't take advantage of Stanford's
 [Claude for Education](https://uit.stanford.edu/service/claude) and
-[ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu). Currently for Mac- Windows coming soon!
+[ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu). _Currently for Mac- Windows coming soon!_
 
 After setup, you can ask in natural language to **have models debate a question**, **give your
 work an adversarial pass**, **turn a file into a plan**, or **reword something verbose**.
