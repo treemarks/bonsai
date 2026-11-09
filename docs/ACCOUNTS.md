@@ -2,6 +2,31 @@
 
 [Home](../README.md) · [Setup](../SETUP.md) · [Usage](USAGE.md) · [Accounts & data](ACCOUNTS.md)
 
+## Routing notice
+
+Bonsai prints this once, before your first sign-in or your first job:
+
+```text
+Before your first job (shown once; nothing to type):
+  - A job you route from a chat goes through that chat (details from your conversation can go with it),
+    outside Stanford's protections.
+  - Fine for ordinary work. For private data (student records, health records), use
+    a Stanford-approved tool directly.
+    https://uit.stanford.edu/guide/riskclassifications
+  - Bonsai doesn't check your files for private data.
+```
+
+At Stanford, for example, PHI goes only through Stanford's approved routes (such as its AI API Gateway); Bonsai's sign-in route is not one of them.
+
+- **What travels.** The chat writes the task and reads the answer. The task and the `-f` files
+  go to the login that runs the job; the answer comes back to the chat. Your chat and its history
+  stay where they are; the job is a separate one-off call on the other login.
+- **What routing saves.** Long work runs on another login's room instead of your chat's. The task and
+  the answer still pass through your chat.
+
+Bonsai is an independent Treemarks project. It is not endorsed by Stanford, Anthropic or OpenAI;
+Stanford appears here as an example institutional configuration, with links to its public pages.
+
 ## Sign your institution seats in as their own pools
 
 ```bash
@@ -9,91 +34,69 @@ bonsai login you@stanford.edu --claude --institution    # opens the Claude sign-
 bonsai login you@stanford.edu --codex  --institution    # opens the ChatGPT sign-in; pick the Stanford workspace
 ```
 
-The first `--institution` prints the [routing notice below](#routing-notice) and, in a Terminal, asks you to type
-`I understand` (typed into that Terminal window, then Return); the date is recorded. That is the
-only time it asks: the second login, later logins and the first job do not repeat it (only a new
-version of the notice prints again, once, without the prompt). If an agent
-runs the setup for you, the notice reaches the agent's output, not your eyes: the skill tells the
-agent to relay it before its first route, and HANDOFF.md tells you to expect that. Each login lands
-in `~/.claude-pools/you@stanford.edu` or
-`~/.codex-pools/you@stanford.edu`, the directories the CLIs call `CLAUDE_CONFIG_DIR` and
-`CODEX_HOME`. Nothing is copied between pools; Claude's credential stays in your login Keychain,
-Codex's in its own `auth.json`, exactly where the CLIs put them. The institution flag is recorded
-per provider, when that sign-in completes; it is your declaration (Bonsai cannot read your
-institution's contracts), and it marks the seat `⌂` on the board so that `auto` routing uses it
-only for `--kind sensitive` work and never for everyday jobs. `⌂` means "marked institution by
-you": a successful sign-in does not verify that you picked the university workspace, and neither
-proves approval for any data; check the account and organization `bonsai doctor` shows. `--name
-<label>` changes the label
-(default `stanford` for a stanford.edu address, else the domain). A second personal login is
-`bonsai login other@gmail.com --claude` with no flag.
+Open the sign-in link in a private window, so the browser cannot finish it with an account it is
+already signed in to; nothing is typed in Terminal to acknowledge the notice. Each login lands in
+`~/.claude-pools/you@stanford.edu` or `~/.codex-pools/you@stanford.edu`, the folders the CLIs call
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME`. Nothing is copied between pools; Claude's credential stays
+in your login Keychain, Codex's in its own `auth.json`, exactly where the CLIs put them.
+
+`--institution` marks the seat `⌂` on the board. The mark is your declaration: a successful
+sign-in does not verify that you picked the university workspace, and neither proves approval for
+any data. `auto` spends a marked seat like any login, in the order your `prefer` setting gives
+([Usage](USAGE.md#which-login-a-job-takes)); a named target (`stanford-codex`) always means that
+seat.
 
 After each sign-in Bonsai prints what actually signed in (for Claude the e-mail, organization and
-plan from `claude auth status`; for Codex the e-mail, plan type such as `edu_pro`, and the last
-four characters of the ChatGPT account id, which is the workspace) and refuses to record a sign-in
-whose e-mail is not the one asked for, printing the exact sign-out line instead. One e-mail with
-two ChatGPT workspaces is two pools: `--pool stanford-pro --name stanford-pro` for the second;
-two pools showing one workspace id are the same workspace signed in twice. Logins are named
-exactly (`stanford`, `stanford-pro`, or the e-mail), never by prefix, and routing words (`auto`,
-`codex`, `openai`, `astra`, ...) are refused as pool names. `--device-auth` (Codex) uses the
-one-time-code sign-in when the browser callback on port 1455 cannot complete.
+plan; for Codex the e-mail, plan type such as `edu_pro`, and a short workspace id). If the e-mail
+is not the one asked for, the pool is marked and no job uses it until you sign it in again as the
+right account. One e-mail with two ChatGPT workspaces is two pools: `--pool stanford-pro --name
+stanford-pro` for the second; two pools showing one workspace id are the same workspace signed in
+twice. Logins are named exactly (`stanford`, `stanford-pro`, or the e-mail), never by prefix, and
+routing words (`auto`, `codex`, `openai`, `astra`, ...) are refused as names. `--device-auth`
+(Codex) uses the one-time-code sign-in when the browser callback on port 1455 cannot complete.
 
-## Routing notice
+## What Bonsai reads and stores
 
-> **The one thing to know.** When you ask a chat (Claude Code or Codex, on your own account) to
-> run a job on your institution account, that chat can see the task and the results, and handles
-> them under its own account and settings. Choosing the institution account for the job does not
-> give the chat the institution's protections. So only route work that is allowed in the chat you
-> started from: Bonsai allows ordinary personal work, including a family project with names in it,
-> and you remain responsible for what you share. For protected information — confidential student
-> records, research interviews, health records, anything your institution classes Moderate or High
-> Risk — open a tool and account your institution approves for that information yourself, outside
-> the chat; an institution login alone does not establish approval (at Stanford, for example,
-> Claude is not approved for PHI at all; the AI API Gateway is). Bonsai does not check files for
-> protected information: it refuses a job that declares `--data moderate|high|phi` before it reads a
-> file, wherever it is run from; undeclared data is routed. It prints this notice before your first
-> job, at `install-skill`, and when you add an institution account, and a one-line reminder on every
-> chat-driven job to one.
-
-Bonsai is an independent Treemarks project. It is not endorsed by Stanford, Anthropic or OpenAI;
-Stanford appears here as an example institutional configuration, with links to its public pages.
-
-## What Bonsai reads, and what it never does
-
-- **Identity.** Claude: `claude auth status --json` under each pool — Claude Code answers with the
-  account, organization and plan; Bonsai reads no credential. Codex: Bonsai reads the pool's
-  `auth.json` to check a sign-in exists and takes the e-mail, plan and workspace from its id token, as
-  labels; it never prints or stores the token.
-- **Codex usage** comes from Codex's own `app-server` (`account/rateLimits/read`), started under
-  the pool's `CODEX_HOME`; Codex sends the request and refreshes the credential itself.
-- **Claude usage is off by default.** Anthropic's published terms say OAuth sign-in on Free, Pro,
-  Max and Ultra plans is for Claude Code and Anthropic's own apps, and Claude Code offers no
-  command that reports usage. If you turn the read on (`bonsai config --set usage_reads.claude=true`),
-  Bonsai reads the token Claude Code stored (macOS asks you to allow that once per login), asks
-  Anthropic's usage surface under its own name (`User-Agent: bonsai/<version>`; the same surface
-  Claude Code's `/usage` screen reads), once per interval, and never follows a redirect with the
-  token. Whether that is ordinary use of your login is your call; the default is no.
-- **What is stored**, all of it owner-only (0600) under `~/.local/state/bonsai/`: the last probe
-  (account e-mail, plan and organization labels, percentages, reset times), a history of
-  percentages, and a job ledger (labels, pool, exit codes, seconds). No token, prompt or output.
-  Config values you set are yours and are printed back by `bonsai config`; unknown keys are refused.
-  The CLIs keep their own session transcripts under their config directories (a Claude job runs
-  with `--no-session-persistence`); job output files go where `-o` says.
-- **Jobs run the official CLIs.** Every job is `claude` or `codex` itself, started with that
-  pool's config directory and an environment that carries only the basics (PATH, HOME, locale,
-  proxy settings): no parent session marks, no API keys or tokens, no provider endpoint overrides,
-  so a job runs on the login it was given, through the CLI's own sign-in and that pool's settings.
-- **No sharing.** A pool is your own sign-in on your own machine. Don't copy a pool directory to
-  another person or machine; sign in there instead. Each login stays subject to its own purpose
-  and its own limits; Bonsai never rotates to another login to get past a stop.
+- **Identity:** `claude auth status` under each pool (Claude Code answers with the account,
+  organization and plan; Bonsai reads no credential). For Codex, Bonsai reads the pool's
+  `auth.json` to check a sign-in exists and takes the e-mail, plan and workspace from its id token,
+  as labels; it never prints or stores the token.
+- **Codex usage** comes from Codex's own app-server, started under the pool's `CODEX_HOME`;
+  Codex sends the request and refreshes the credential itself.
+- **Claude usage** comes from Claude Code itself: the usage each Claude job reports, and Claude
+  Code's `/usage` (no model call) for a login whose reading is older than 15 minutes, when a job is
+  about to go to it or you open the board. Bonsai reads no stored Claude token.
+- **Stored** under `~/.local/state/bonsai/`, in files and folders Bonsai gives owner-only permission bits (it does
+  not check access lists, the folders above them, or Windows permissions): the last probe (e-mail, plan and
+  organization labels, percentages, reset times), the latest Claude usage readings, a job ledger (labels, pool, outcomes, seconds) and a failed job's own messages (they
+  can quote your task). No token. A job's answer is held there privately until it is published to the file you named
+  (or printed); a crash can leave that staging file behind.
+- **Jobs** are `claude` or `codex` themselves, with that pool's config folder and an environment
+  of basics only (PATH, HOME, locale, proxy): no API keys, tokens or endpoint overrides, so the
+  one login a job is handed is the one it was given.
+- **Network:** Bonsai's own is `git fetch` (during an update, and once a day from the live board in a terminal, to
+  see whether a new version is out) and, for the board's MODEL column, a request to Ollama on this Mac
+  (`http://127.0.0.1:11434`, no proxy). Everything else is the CLIs'. An update you approve runs the new code, so
+  update only from github.com/treemarks/bonsai (Bonsai prints the source and merges exactly the commits it listed).
+- **What stays on this Mac:** sign-ins in each login's folder (anything running as you can read file-based ones;
+  separate folders choose an account, they don't wall one off); the job ledger (ids, times, login, outcome, not your
+  prompts); a failed job's own messages in Bonsai's state folder (they can quote the task); and the answer files you
+  asked for. Keep these folders out of synced drives if that matters to you.
+- **Files you attach:** `-f` refuses sign-in and key files (the login folders, `~/.ssh`, `auth.json` and the like),
+  even through a link; it does not look for other private data.
+- **Which account a login is.** A sign-in that comes back as another e-mail is refused. Bonsai does not yet record
+  which workspace a login was meant for, so a login that changes workspace under the same e-mail is not caught;
+  `bonsai doctor` shows what each login reports.
+- **No sharing.** A pool is your own sign-in on your own machine. Don't copy a pool folder to
+  another person or machine; sign in there instead.
 
 ## Terms of use
 
 Each login is yours under its provider's terms, and an institution seat is yours under your
 institution's agreement as well. Read them; Bonsai cannot read them for you.
 
-Bonsai is for one person's own accounts on one machine, each used under its vendor's terms.
-It is not for pooling other people's logins, sharing an account, or routing anyone else's
+Bonsai is for one person's own accounts on one machine, each used under its vendor's
+terms. It is not for pooling other people's logins, sharing an account, or routing anyone else's
 requests through your plan.
 
 - Anthropic: [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) (personal plans),
@@ -118,6 +121,6 @@ or local processing. Stanford approves ChatGPT Edu for Low, Moderate and High Ri
 and Claude Code for Low to High with PHI only through Stanford's AI API Gateway; no AI tool is
 approved for payment-card data, CUI or export-controlled material; and connectors, plugins and
 skills need their own review. Stanford approves tools, not every configuration of them. The honest
-sentence about a routed Bonsai job is: the same account and tool Stanford approved, driven
-headless, with the task written and the answer read by whatever asked for it.
-
+sentence about a routed Bonsai job is: a Stanford account and tool, in a configuration Stanford
+has not reviewed, driven headless, with the task written and the answer read by whatever asked
+for it.

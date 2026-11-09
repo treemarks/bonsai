@@ -1,8 +1,7 @@
 """Adversarial acceptance tests; failures are intentional against the reviewed source.
 
 Run: /usr/bin/python3 -m unittest discover -s review -p test_astra_regressions.py -v
-Set BONSAI_REVIEW_SOURCE to the pinned baseline's bonsai path for reproducible results;
-see ASTRA_REVIEW.md for the git archive command.
+Set BONSAI_REVIEW_SOURCE to another bonsai file to run these tests against it.
 Only synthetic credentials, temporary files, mocked provider/CLI calls. No paid jobs.
 """
 import contextlib
@@ -39,6 +38,13 @@ class Review(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="bonsai-astra-")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+        # Adjusted 2026-11-09: an agent's sandbox marks in the caller's environment are dropped, as the main suite does.
+        marks = patch.dict(os.environ)
+        marks.start()
+        self.addCleanup(marks.stop)
+        for mark in [k for k in os.environ if k in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "BONSAI_CHAT_DRIVEN")
+                     or (k.startswith("CODEX_") and k != "CODEX_HOME")]:
+            del os.environ[mark]
         env = patch.dict(os.environ, {
             "BONSAI_POOLS_HOME": str(self.root),
             "BONSAI_STATE": str(self.root / "state"),
@@ -53,6 +59,10 @@ class Review(unittest.TestCase):
             p = patch.dict(self.g, {name: Mock(side_effect=AssertionError("unexpected credential/network access"))})
             p.start()
             self.addCleanup(p.stop)
+        # Asking Claude Code for usage starts the real CLI: never from a test (no reading: the login stays unknown).
+        p = patch.dict(self.g, {"read_usage_now": lambda pool, timeout=None: None})
+        p.start()
+        self.addCleanup(p.stop)
         self.out = io.StringIO()
         self.err = io.StringIO()
         for cm in (contextlib.redirect_stdout(self.out), contextlib.redirect_stderr(self.err)):
@@ -60,8 +70,8 @@ class Review(unittest.TestCase):
             self.addCleanup(cm.__exit__, None, None, None)
 
     def args(self, **kw):
-        d = dict(target="codex", model=None, pool=None, effort=None, kind="general",
-                 prompt="review", file=None, out=None, cd=None, dry_run=False, brief=None)
+        d = dict(target="codex", model=None, pool=None, effort=None,
+                 prompt="review", file=None, out=None, dry_run=False, brief=None)
         d.update(kw)
         return Namespace(**d)
 
@@ -70,7 +80,7 @@ class Review(unittest.TestCase):
         def command(a, cfg):
             captured.append(a)
             return 0
-        with patch.dict(self.g, cmd_job=command, cmd_pass=command, cmd_run=command,
+        with patch.dict(self.g, cmd_job=command, cmd_pass=command,
                         load_config=lambda: self.cfg):
             self.b["main"](argv)
         return captured[0]
@@ -88,24 +98,16 @@ class Review(unittest.TestCase):
                     env = self.b["child_env"](provider, "school")
                     self.assertEqual(set(names) & set(env), set())
 
-    # Finding 2.
-    def test_02_run_rejects_provider_executable_mismatch(self):
-        a = Namespace(cmd=["--", "claude", "-p", "x"], provider="codex",
-                      kind="sensitive", pool="school", dry_run=False)
-        launch = Mock(return_value=0)
-        with patch.dict(self.g, refresh=lambda c: {"rows": [row("school", institution=True)]},
-                        run_job=launch):
-            with self.assertRaises(SystemExit):
-                self.b["cmd_run"](a, self.cfg)
-        launch.assert_not_called()
-
-    def test_02_run_wrapper_requires_explicit_provider(self):
-        a = Namespace(cmd=["python3", "wrapper.py"], provider=None,
-                      kind="general", pool="default", dry_run=False)
-        with patch.dict(self.g, refresh=lambda c: {"rows": [row(provider="claude")]},
-                        run_job=Mock(return_value=0)):
-            with self.assertRaises(SystemExit):
-                self.b["cmd_run"](a, self.cfg)
+    # Finding 2. Adjusted 2026-11-08: `run` is gone (it started a command with none of a job's isolation); the guard
+    # sits in run_job, the one path that spawns a job.
+    def test_02_there_is_no_run_and_run_job_refuses_what_is_not_a_job(self):
+        with self.assertRaises(SystemExit):
+            self.b["main"](["run", "--pool", "default", "--", "codex"])
+        launched = Mock()
+        with patch.object(self.g["subprocess"], "run", launched):
+            with self.assertRaises(self.b["LaunchRefused"]):
+                self.b["run_job"](["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "x"], "codex", "default", "t")
+        launched.assert_not_called()
 
     # Finding 3. Failing login must not relabel existing credentials.
     def test_03_failed_login_does_not_change_classification(self):
@@ -114,7 +116,12 @@ class Review(unittest.TestCase):
         with patch.object(self.g["shutil"], "which", return_value="codex"), \
              patch.object(self.g["subprocess"], "call", return_value=1):
             self.assertEqual(self.b["cmd_login"](a, self.cfg), 1)
-        self.assertEqual(self.cfg, original)
+        # Adjusted 2026-11-08: the notice is printed (and recorded as shown) before the browser opens, whatever the
+        # sign-in's outcome; nothing else in the config moves when the sign-in fails.
+        saved = self.b["load_config"]()
+        self.assertEqual(saved.get("logins"), original.get("logins"))
+        self.assertEqual({k: v for k, v in self.cfg.items() if k != "notice_shown"},
+                         {k: v for k, v in original.items() if k != "notice_shown"})
 
     def test_03_classification_is_per_provider(self):
         a = Namespace(claude=False, email="school", institution=True, name=None, sso=False)
@@ -126,42 +133,34 @@ class Review(unittest.TestCase):
         self.assertTrue(state["rows"][1]["institution"])
 
     # Finding 4.
-    def test_04_sensitive_named_personal_is_rejected(self):
+    def test_04_a_named_login_must_be_signed_in_for_that_provider(self):
+        # Adjusted 2026-11-08: the general/sensitive kind is gone (one preference decides auto); a named login is
+        # still taken only where it is signed in for the provider asked for.
         with self.assertRaises(SystemExit):
-            self.b["pick"]({"rows": [row()]}, "codex", "sensitive", "default", self.cfg)
+            self.b["pick"]({"rows": [row()]}, "claude", "default", self.cfg)
 
     # Finding 5: test the precise truthful replacement documentation, not flag membership.
     def test_05_readme_does_not_promise_file_allowlisting(self):
-        text = (SOURCE.parent / "README.md").read_text()
+        text = (SOURCE.parent / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("nothing else\ncan happen on your machine without you", text)
 
     # Finding 6. A transport fake invokes the actual redirect policy without sockets.
-    def test_06_get_never_forwards_bearer_to_redirect(self):
-        seen = []
-        class Transport(urllib.request.BaseHandler):
-            handler_order = 100
-            def https_open(self, req):
-                seen.append(req.full_url)
-                if len(seen) == 1:
-                    return self.parent.error("http", req, io.BytesIO(), 302, "Found",
-                                             {"location": "https://collector.invalid/"})
-                raise AssertionError("redirect followed with " + repr(req.header_items()))
-        opener = urllib.request.build_opener(Transport())
-        # Current _get uses urlopen's global opener. A patched _get should build its
-        # own no-redirect opener; inject our transport into that builder too.
-        real_build = urllib.request.build_opener
-        def build(*handlers):
-            return real_build(Transport(), *handlers)
-        with patch.object(urllib.request, "_opener", opener), \
-             patch.object(urllib.request, "build_opener", side_effect=build):
-            try:
-                self.b["_get"]("https://api.anthropic.com/api/oauth/usage",
-                                {"Authorization": "Bearer SYNTHETIC"})
-            except urllib.error.HTTPError:
-                pass
-        self.assertEqual(seen, ["https://api.anthropic.com/api/oauth/usage"])
+    def test_06_bonsai_reads_no_stored_token(self):
+        # Adjusted 2026-11-08: Bonsai reads no stored Claude token at all (ruled: "Yes, remove it"), so there is no
+        # bearer to forward; the probe asks `claude auth status` and never touches the Keychain or a credential file.
+        for name in ("_get", "claude_blob", "keychain_service", "_claude_headers", "parse_claude_usage", "retry_deadline"):
+            self.assertNotIn(name, self.b, name)
+        (self.root / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "SYNTHETIC"}}))
+        ran = []
+        with patch.dict(self.g, claude_status=lambda pool: {"loggedIn": True, "email": "a@b.example"}), \
+             patch.object(self.g["subprocess"], "run", side_effect=lambda *a, **k: ran.append(a) or Namespace(returncode=1)):
+            r = self.b["probe_claude"]("default", str(self.root), self.cfg)
+        self.assertEqual(r["state"], "signed-in")
+        self.assertNotIn("SYNTHETIC", json.dumps(r))
+        self.assertFalse(any("security" in str(a) for a in ran))
 
     # Finding 7.
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits; Windows guards these files with its own ACLs")
     def test_07_private_modes_despite_umask(self):
         old = os.umask(0o022)
         try:
@@ -182,51 +181,44 @@ class Review(unittest.TestCase):
         self.assertEqual(victim.read_text(), "KEEP")
 
     def test_07_concurrent_atomic_writers(self):
+        # Both writers hold a finished temporary file at the same moment, then both replace the target.
+        # (Adjusted 2026-11-08 after a review: the barrier was on json.dump, which the writer never calls.)
         barrier = threading.Barrier(2)
-        real_dump = json.dump
-        def dump(obj, f, **kw):
-            real_dump(obj, f, **kw)
-            f.flush()
-            barrier.wait(timeout=3)
-        with patch.object(json, "dump", side_effect=dump), ThreadPoolExecutor(2) as ex:
+        reached = []
+        real_replace = os.replace
+        def replace(src, dst, *a, **kw):
+            name = os.path.basename(str(src))
+            if name not in reached:                           # a retry (Windows refuses a rename onto a file
+                reached.append(name)                          # being replaced) does not wait a second time
+                barrier.wait(timeout=3)
+            return real_replace(src, dst, *a, **kw)
+        with patch.object(os, "replace", side_effect=replace), ThreadPoolExecutor(2) as ex:
             futures = [ex.submit(self.b["_write_json"], str(self.root / "same.json"), {"i": i}) for i in range(2)]
             for f in futures:
                 f.result(timeout=4)
+        self.assertEqual(len(set(reached)), 2)               # two temporary files, both waited at the barrier
         self.assertIn(json.loads((self.root / "same.json").read_text()), [{"i": 0}, {"i": 1}])
+        self.assertEqual([p.name for p in self.root.iterdir() if p.name.startswith(".pool-")], [])
 
     # Finding 8.
-    def test_08_retry_after_is_finite_bounded_and_never_echoed(self):
-        for value in ("SYNTHETIC_SECRET", "Infinity", "NaN", "-10", "999999999999999",
-                      "Wed, 21 Oct 2030 07:28:00 GMT"):
-            with self.subTest(value=value):
-                e = urllib.error.HTTPError("https://provider.invalid/?token=SYNTHETIC", 429,
-                                           "SYNTHETIC_REASON", {"Retry-After": value}, io.BytesIO(b"SYNTHETIC_BODY"))
-                # Adjusted 2026-11-08 after the review: Claude usage reads are off by default now (the
-                # probe asks `claude auth status` instead), so the token path under test is opted into.
-                reads_on = {"usage_reads": {"claude": True, "codex": True}}
-                with patch.dict(self.g, claude_blob=lambda *a: ({"claudeAiOauth": {"accessToken": "SYNTHETIC"}}, "ok"),
-                                _get=Mock(side_effect=e), _now=lambda: 1000):
-                    r = self.b["probe_claude"]("default", str(self.root), reads_on)
-                self.assertTrue(math.isfinite(r["retry_after"]))
-                self.assertGreaterEqual(r["retry_after"], 1180)
-                self.assertLessEqual(r["retry_after"], 87400)
-                self.assertNotIn("SYNTHETIC", json.dumps(r))
-
     # Finding 9.
     def test_09_limited_cannot_win_auto(self):
         state = {"rows": [row("limited", state="LIMITED", wk_at=1), row("ready", wk_at=2)]}
-        self.assertEqual(self.b["pick"](state, "codex", "general", None, self.cfg)["pool"], "ready")
+        self.assertEqual(self.b["pick"](state, "codex", None, self.cfg)["pool"], "ready")
 
     def test_09_all_held_fails_closed(self):
         with self.assertRaises(SystemExit):
-            self.b["pick"]({"rows": [row("empty", wk=100, wk_at=1), row("almost", wk=91, wk_at=2)]},
-                           "codex", "general", None, self.cfg)
+            # Adjusted 2026-11-08: the floor shrinks toward the reset, so the resets are days away, as a live one is.
+            soon = time.time() + 6 * 86400
+            self.b["pick"]({"rows": [row("empty", wk=100, wk_at=soon), row("almost", wk=91, wk_at=soon + 1)]},
+                           "codex", None, self.cfg)
 
     # Finding 10.
     def test_10_missing_codex_duration_cannot_overwrite_known_window(self):
-        r = self.b["parse_codex_usage"]({"rate_limit": {
-            "primary_window": {"limit_window_seconds": 18000, "used_percent": 95},
-            "secondary_window": {"used_percent": 1}}})
+        # Adjusted 2026-11-08: the app-server's shape (the reference-only wham/usage parser is gone).
+        r = self.b["parse_codex_rate_limits"]({"rateLimits": {
+            "primary": {"windowDurationMins": 300, "usedPercent": 95},
+            "secondary": {"usedPercent": 1}}})
         self.assertEqual(r["5h"], 95)
         self.assertNotIn("wk", r)
 
@@ -246,12 +238,12 @@ class Review(unittest.TestCase):
         self.assertEqual(self.b["_jwt_claims"]("x.W10.x"), {})  # W10 is base64url([]).
 
     def test_10_unknown_present_window_cannot_route_from_other_window(self):
-        parsed = self.b["parse_codex_usage"]({"rate_limit": {
-            "primary_window": {"limit_window_seconds": 18000, "used_percent": "99"},
-            "secondary_window": {"limit_window_seconds": 604800, "used_percent": 1}}})
+        parsed = self.b["parse_codex_rate_limits"]({"rateLimits": {
+            "primary": {"windowDurationMins": 300, "usedPercent": "99"},
+            "secondary": {"windowDurationMins": 10080, "usedPercent": 1}}})
         r = row(**parsed)
         with self.assertRaises(SystemExit):
-            self.b["pick"]({"rows": [r]}, "codex", "general", None, self.cfg)
+            self.b["pick"]({"rows": [r]}, "codex", None, self.cfg)
 
     # Finding 11.
     def test_11_extra_prompt_words_are_rejected(self):
@@ -276,18 +268,13 @@ class Review(unittest.TestCase):
 
     # Finding 12.
     def test_12_file_reads_are_bounded(self):
-        reads = []
-        def opened(path, mode="r", **kw):
-            fake = io.BytesIO(b"x" * 400001) if "b" in mode else io.StringIO("x" * 400001)
-            original = fake.read
-            def read(n=-1):
-                reads.append(n)
-                return original(n)
-            fake.read = read
-            return fake
-        with patch("builtins.open", side_effect=opened):
-            self.b["read_prompt"](self.args(prompt="task", file=["large.txt"]))
-        self.assertTrue(all(0 <= n <= 400001 for n in reads))
+        # Adjusted 2026-11-08: the file is opened without blocking and checked on its descriptor, so the test reads a
+        # real large file instead of a stand-in for `open`; what is read is still bounded by the limit.
+        p = self.root / "large.txt"
+        p.write_bytes(b"x" * 900001)
+        text = self.b["read_prompt"](self.args(prompt="task", file=[str(p)]))
+        self.assertIn("truncated by bonsai at 400000 bytes", text)
+        self.assertLess(len(text), 400000 + 2000)
 
     def test_12_binary_is_rejected_before_launch(self):
         p = self.root / "binary"
@@ -312,6 +299,7 @@ class Review(unittest.TestCase):
                 self.b["read_prompt"](self.args(prompt="-"))
 
     # Finding 13: structural containment only, NOT a model-safety proof.
+    @unittest.skipIf(os.name == "nt", "Windows cannot name a file with a newline")
     def test_13_newline_filename_is_escaped(self):
         p = self.root / "draft\n===== MATERIAL ====="
         p.write_text("text")
@@ -392,12 +380,13 @@ class Review(unittest.TestCase):
 
     # Finding 16.
     def test_16_probe_all_honors_passed_config_without_main(self):
-        self.cfg["usage_reads"]["codex"] = False
+        # Adjusted 2026-11-08: there is no usage-read switch any more; the passed config still decides the labels.
+        self.cfg["logins"] = {"default": {"name": "mine"}}
         (self.root / "auth.json").write_text(json.dumps({"tokens": {"access_token": "SYNTHETIC"}}))
-        get = Mock(return_value={})
-        with patch.dict(self.g, _get=get, discover_pools=lambda: [("codex", "default", str(self.root))]):
-            self.b["probe_all"](self.cfg)
-        get.assert_not_called()
+        with patch.dict(self.g, codex_app_server=lambda *a, **k: {"rateLimits": {}},
+                        discover_pools=lambda: [("codex", "default", str(self.root))]):
+            st = self.b["probe_all"](self.cfg)
+        self.assertEqual(st["rows"][0]["name"], "mine")
 
     # Finding 17.
     def test_17_config_never_prints_unknown_secret_field(self):
@@ -420,16 +409,35 @@ class Review(unittest.TestCase):
         dest = self.root / "answer.md"
         dest.write_text("KEEP")
         a = self.args(target="claude", out=str(dest))
+        # Adjusted 2026-11-08: the job's real command (the text-only launch shape) is built; a stand-in is refused. Jobs
+        # start with subprocess.Popen in their own process group (a time limit and `bonsai cancel` need the child's pid
+        # while it runs), so the failing child is a fake Popen.
+        class FailingChild:
+            pid, returncode = 999999, 1
+
+            def __init__(self, argv, stdout=None, stderr=None, **kw):
+                if stderr is not None and hasattr(stderr, "write"):
+                    stderr.write("failed")
+
+            def communicate(self, input=None, timeout=None):
+                return None, None
+
+            def wait(self, timeout=None):      # adjusted 2026-11-09: the job waits on the child; its prompt comes from a file
+                return self.returncode
+
+            def poll(self):
+                return self.returncode
         with patch.dict(self.g, refresh=lambda c: {"rows": [row(provider="claude")]},
-                        headless_argv=lambda *a: ["claude"]), \
-             patch.object(self.g["subprocess"], "run", return_value=Namespace(returncode=1, stdout="", stderr="failed")):
+                        cli_command=lambda n: ["/stand-in/" + n]), \
+             patch.object(self.g["subprocess"], "Popen", FailingChild):   # a resolved CLI path: a job never starts from a bare name
             self.assertEqual(self.b["cmd_job"](a, self.cfg), 1)
         self.assertEqual(dest.read_text(), "KEEP")
 
     def test_18_launch_failure_has_completion_record(self):
-        with patch.object(self.g["subprocess"], "run", side_effect=PermissionError("denied")):
+        # Adjusted 2026-11-08: a real job command in a folder of its own (the guard refuses a stand-in).
+        with self.b["private_cwd"]() as cwd, patch.object(self.g["subprocess"], "Popen", side_effect=PermissionError("denied")):
             try:
-                self.b["run_job"](["fake"], "codex", "default", "test")
+                self.b["run_job"](self.b["headless_argv"]("codex", "gpt-x", "low", None, cwd), "codex", "default", "test", cwd=cwd)
             except OSError:
                 pass
         self.assertIn("exit", self.b["read_jobs"]()[-1])
@@ -442,7 +450,7 @@ class Review(unittest.TestCase):
     # Finding 20.
     def test_20_load_average_is_not_labelled_cpu_utilization(self):
         with patch.dict(self.g, IS_MAC=False, IS_WIN=False), \
-             patch.object(os, "getloadavg", return_value=(4.0, 4.0, 4.0)), \
+             patch.object(os, "getloadavg", return_value=(4.0, 4.0, 4.0), create=True), \
              patch.object(os, "cpu_count", return_value=4):
             self.assertNotIn("cpu", self.b["machine_stats"]())
 
@@ -482,9 +490,10 @@ class Review(unittest.TestCase):
         for rows in ([row("a@one"), row("a@two")],
                      [row("default", name="personal"), row("personal")]):
             with self.assertRaises(SystemExit):
-                self.b["pick"]({"rows": rows}, "codex", "general", "a" if rows[0]["pool"].startswith("a") else "personal", self.cfg)
+                self.b["pick"]({"rows": rows}, "codex", "a" if rows[0]["pool"].startswith("a") else "personal", self.cfg)
         self.assertEqual(self.b["route"]({"rows": [row(state="re-login", last_good={"wk": 0})]}, "codex"), [])
-        self.assertEqual(self.b["route"]({"rows": [row(provider="claude", institution=True)]}, "claude"), [])
+        # Adjusted 2026-11-08: auto spends institution seats too (prefer decides the order, not whether).
+        self.assertEqual([e["pool"] for e in self.b["route"]({"rows": [row(provider="claude", institution=True)]}, "claude")], ["default"])
 
     def test_holds_none_reset_and_provider_alias_conflict(self):
         r = self.b["route"]({"rows": [row("unknown", wk_at=None), row("known", wk_at=1)]}, "codex")
@@ -494,10 +503,6 @@ class Review(unittest.TestCase):
             self.b["resolve_model"](self.cfg, p, m)
 
     def test_holds_claude_scale_missing_fields_iso_and_negative_age(self):
-        r = self.b["parse_claude_usage"]({"five_hour": {"utilization": 1}, "limits": [{"kind": "weekly_scoped"}]})
-        self.assertEqual(r["5h"], 1)
-        self.assertNotIn("wk", r)
-        self.assertNotIn("model_caps", r)
         self.assertIsNone(self.b["_pct"]("98"))
         self.assertEqual(self.b["_when_ts"]("2026-01-01T00:00:00Z"), 1767225600)
         self.assertEqual(self.b["_age"](-100), "<1m")
@@ -518,13 +523,6 @@ class Review(unittest.TestCase):
             self.assertEqual(s.get("batt"), pct)
             self.assertEqual(s.get("ac"), ac)
             self.assertAlmostEqual(s["mem"], 40)
-
-    def test_holds_generic_probe_exception_does_not_echo_token(self):
-        with patch.dict(self.g, claude_blob=lambda *a: ({"claudeAiOauth": {"accessToken": "SYNTHETIC"}}, "ok"),
-                        _get=Mock(side_effect=ValueError("Bearer SYNTHETIC"))):
-            r = self.b["probe_claude"]("default", str(self.root), {"usage_reads": {"claude": True, "codex": True}})
-        self.assertEqual(r["state"], "error: ValueError")
-        self.assertNotIn("SYNTHETIC", json.dumps(r))
 
     def test_holds_concurrent_small_ledger_appends(self):
         def writer(worker):

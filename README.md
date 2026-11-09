@@ -31,14 +31,9 @@ Here's what that looks like.
 
 <img src="docs/images/use-case-4-reword-compact.png" alt="Hypothetical conversation: Claude’s garden invitation adds annual-event history, past locations, organizers and logistics in progressively smaller type. ChatGPT condenses it to the time, location, welcome and tools." width="640">
 
-<details>
-<summary>See the pool gauge</summary>
+<img src="docs/images/bonsai-gauge.png" alt="The Bonsai gauge: personal and Stanford logins for ChatGPT and Claude, with how much each has left and when it resets, and this Mac's load; sample figures." width="760">
 
-<img src="docs/images/pool-gauge-student-bars.png" alt="Example Bonsai gauge with colored usage bars for personal Claude, Stanford Claude and Stanford ChatGPT; all usage figures are sample data." width="800">
-
-Example setup with sample usage; Claude usage reads enabled. [How to read the board](docs/USAGE.md#the-board).
-
-</details>
+`bonsai gauge`, with sample figures. [How to read it](docs/USAGE.md#the-board).
 
 ## Get started
 
