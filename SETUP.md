@@ -356,7 +356,7 @@ do it for the pool you mean, not as blanket cleanup.
 ```bash
 bonsai gauge --once                  # the board, one frame
 bonsai route                         # which login each kind of work would take
-bonsai job codex --dry-run "hi"      # the exact command a job would run, nothing spent
+bonsai job codex --dry-run "hi"      # the command a job would run; no model call
 bonsai job codex -o /tmp/hi.md "Reply with exactly: ok" && cat /tmp/hi.md
 ```
 

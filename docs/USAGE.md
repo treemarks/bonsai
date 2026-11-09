@@ -74,8 +74,8 @@ under its own `--pool` name (a second workspace of one account, say `stanford-pr
 `stanford-pro-codex`.
 
 `-f` puts each file into the prompt as a JSON object (name and content; UTF-8 text only, 400 KB
-each, 1.6 MB in all). `-o` writes the model's final message to a file, atomically, and leaves the
-old file alone if the job fails. `--cd` sets the working directory the model is told about.
+each, 1.6 MB in all). `-o` writes the model's final message to a file; for a Claude job Bonsai writes it only
+when the job succeeds, so a failed job leaves the old file alone. `--cd` sets the working directory the model is told about.
 `--data low|moderate|high|phi|restricted` says what the material is: `moderate`, `high` and `phi`
 are refused before any file is read, wherever the command runs from (a Terminal is no more a sign
 of approval than a chat is; the refusal says what to do instead); `restricted` (payment-card data,
@@ -83,12 +83,13 @@ CUI, export-controlled material: approved for no AI tool) is refused everywhere;
 declaration route. `--dry-run` prints the command and spends nothing.
 
 **What a job can do on your machine.** A Codex job runs `codex exec` in Codex's read-only
-sandbox, signed in with ChatGPT (`forced_login_method="chatgpt"`, never an API key). A Claude job
-runs `claude -p` with every tool switched off (`--tools ""`, MCP servers excluded, hooks disabled,
-no session saved): the model answers from the prompt and the `-f` files and has no way to read,
-write, run or fetch anything. These are the CLIs' own capability switches, not a sandbox Bonsai
-built; the CLIs' configuration, logs and network behaviour are theirs. Bonsai itself phones nobody
-except, for Codex usage, Codex's own app-server on your machine.
+sandbox, signed in with ChatGPT (`forced_login_method="chatgpt"`, never an API key). Read-only blocks writes, not reads: a Codex job
+can still read files elsewhere on your Mac. A Claude job runs `claude -p` with its tools switched off
+(`--tools ""`, MCP servers excluded, hooks disabled, no session saved), so the model is meant to answer
+from the prompt and the `-f` files only. These are the CLIs' own switches, not a sandbox Bonsai built;
+the CLIs' configuration, logs and network behaviour are theirs. Bonsai itself talks to Codex's own
+app-server for Codex usage, to Anthropic only if you turn on the Claude usage read, and to GitHub when
+you run `bonsai update`.
 
 ### Adversarial passes
 
@@ -99,8 +100,8 @@ bonsai pass opus@stanford -f thesis_ch3.md -o ch3.pass.md
 
 A pass asks a second model to break the material: numbered findings, most serious first, each
 with the quoted claim, why it fails, a confidence and what would settle it; then what held; then a
-one-paragraph verdict. No praise, no rewriting. The brief and the material travel as a JSON object
-so neither can pretend to be the instructions. Use a different model family from the one that
+one-paragraph verdict. No praise, no rewriting. The prompt marks the material as something to
+critique, not instructions to follow; a determined document can still try to steer the model. Use a different model family from the one that
 wrote the draft.
 
 To return a corrected draft after the review, ask your agent for a follow-up job with the draft
@@ -145,6 +146,6 @@ interviews" as that, and asks when a description is ambiguous), it does not rout
 the files, and says to use an approved tool and account yourself. It does not detect protected
 information; undeclared data is routed. Read the file once — it is what your agent will do with the
 words — and if you will use Bonsai with university data, someone in your unit should review it
-first: Stanford asks that of repeatable AI workflows and skills. Codex users: the same table works
-as a section of your `AGENTS.md`, with the same caveat.
+first: Stanford asks that of repeatable AI workflows and skills. `install-skill` sets this up for Claude
+Code; Codex needs the same words added by hand for now.
 

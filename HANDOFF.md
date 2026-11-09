@@ -35,7 +35,7 @@ chat.)
 
 - A board (`bonsai gauge`) with one row per login — personal Claude, Stanford Claude, Stanford
   Codex, and personal ChatGPT if you sign that in — showing how much of each week's and each
-  five-hour window is left, when each resets, and your Air's own load on the row beneath. It is the
+  five-hour window is left, when each resets, and your Mac's own load on the row beneath. It is the
   Treemarks pool gauge in miniature. (Claude rows show the plan and `signed-in` rather than
   percentages unless you turn Claude usage reads on; [the usage guide](docs/USAGE.md#the-board) says why.)
 - Routing: `bonsai job stanford-codex ...` runs a job on that seat; `bonsai job astra ...` or
@@ -100,8 +100,8 @@ re-run `bonsai install-skill`; it refuses to touch a checkout a shell has redire
 
 ## The steps
 
-1. Follow `SETUP.md` from the top: Command Line Tools, Claude Code, Codex, Bonsai, sign-ins. On a
-   clean Air this is about ten minutes, most of it the Command Line Tools download.
+1. Follow `SETUP.md` from the top: Command Line Tools, Claude Code, Codex, Bonsai, sign-ins. Allow
+   about 40 minutes the first time, most of it the downloads and sign-ins.
 2. `bonsai doctor` should list `git`, `claude`, `codex` with versions and your three (or four)
    logins as `signed in as ...`. If something is missing it prints the install line.
 3. `bonsai gauge --once`.

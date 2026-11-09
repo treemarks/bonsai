@@ -61,10 +61,11 @@ Stanford appears here as an example institutional configuration, with links to i
 ## What Bonsai reads, and what it never does
 
 - **Identity.** Claude: `claude auth status --json` under each pool — Claude Code answers with the
-  account, organization and plan; Bonsai reads no credential. Codex: the e-mail claim of the
-  stored id token, as a label.
+  account, organization and plan; Bonsai reads no credential. Codex: Bonsai reads the pool's
+  `auth.json` to check a sign-in exists and takes the e-mail, plan and workspace from its id token, as
+  labels; it never prints or stores the token.
 - **Codex usage** comes from Codex's own `app-server` (`account/rateLimits/read`), started under
-  the pool's `CODEX_HOME`; Codex holds and refreshes the credential and Bonsai never sees it.
+  the pool's `CODEX_HOME`; Codex sends the request and refreshes the credential itself.
 - **Claude usage is off by default.** Anthropic's published terms say OAuth sign-in on Free, Pro,
   Max and Ultra plans is for Claude Code and Anthropic's own apps, and Claude Code offers no
   command that reports usage. If you turn the read on (`bonsai config --set usage_reads.claude=true`),
@@ -81,7 +82,7 @@ Stanford appears here as an example institutional configuration, with links to i
 - **Jobs run the official CLIs.** Every job is `claude` or `codex` itself, started with that
   pool's config directory and an environment that carries only the basics (PATH, HOME, locale,
   proxy settings): no parent session marks, no API keys or tokens, no provider endpoint overrides,
-  so a job can only bill the login it was given through the CLI's own sign-in.
+  so a job runs on the login it was given, through the CLI's own sign-in and that pool's settings.
 - **No sharing.** A pool is your own sign-in on your own machine. Don't copy a pool directory to
   another person or machine; sign in there instead. Each login stays subject to its own purpose
   and its own limits; Bonsai never rotates to another login to get past a stop.
