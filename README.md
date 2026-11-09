@@ -10,11 +10,12 @@ already have. Most of us default to personal logins and don't take advantage of 
 [ChatGPT Edu](https://uit.stanford.edu/service/openai-chatgpt-edu).
 
 After setup, you can ask in natural language to **have models debate a question**, **give your
-work an adversarial pass**, or **turn a file into a plan**. Here's what that looks like.
+work an adversarial pass**, **turn a file into a plan**, or **reword something verbose**.
+Here's what that looks like.
 
 ### 1. Have the models debate a question
 
-<img src="docs/images/use-case-1-mars-compact.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. You conclude: ok, i pick 2043 because you’re right—we need to prove that people can come back." width="640">
+<img src="docs/images/use-case-1-mars-blog.png" alt="You ask Claude when humanity will get to Mars and to debate ChatGPT. Claude picks 2044, Codex picks 2042, and Claude challenges return readiness. Claude says 2042 is too soon before proving people can get home. You conclude: ok i pick 2043. please update my blog post!" width="640">
 
 [Adapted from a recorded Mars debate](docs/MARS-DEBATE.md).
 
@@ -26,12 +27,9 @@ work an adversarial pass**, or **turn a file into a plan**. Here's what that loo
 
 <img src="docs/images/use-case-3-architecture-compact.png" alt="Illustrative design handoff: Claude provides a design-specification file. You ask ChatGPT for architectural plans based on it, and the reply includes a document with a concept-plan preview." width="640">
 
-<details>
-<summary>Another way to use it: make a draft concise</summary>
+### 4. Reword something verbose
 
-<img src="docs/images/use-case-3-concise-compact.png" alt="Hypothetical conversation: Claude’s detailed garden invitation grows progressively smaller in type; you ask ChatGPT to make it concise, and it returns one short, welcoming invitation." width="640">
-
-</details>
+<img src="docs/images/use-case-4-reword-compact.png" alt="Hypothetical conversation: Claude’s garden invitation adds annual-event history, past locations, organizers and logistics in progressively smaller type. ChatGPT condenses it to the time, location, welcome and tools." width="640">
 
 <details>
 <summary>See the pool gauge</summary>

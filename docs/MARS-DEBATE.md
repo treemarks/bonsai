@@ -28,9 +28,10 @@ The README's NASA–SpaceX artwork is an imagined editorial illustration.
 
 After reviewing the debate, the reader proposed:
 
-> ok i pick 2043 because youre right we need to prove that people can come back.
+> ok i pick 2043. please update my blog post!
 
-This is a new closing response, not an additional model reply from the original trial.
+This is a new closing response for the illustration, not an additional reply from the original trial.
+The README also paraphrases Claude’s return-readiness objection for brevity.
 
 ## Illustration
 
