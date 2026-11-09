@@ -124,7 +124,9 @@ step 4 fixes that. (`npm install -g @anthropic-ai/claude-code` also works if you
 
 Skip this step if you have no ChatGPT account.
 
-Check: `codex --version`, or `"$HOME/.local/bin/codex" --version`.
+Check: `codex --version`, or `"$HOME/.local/bin/codex" --version`. A ChatGPT job that may search (`--web`) also
+needs `codex-code-mode-host` beside `codex`: Homebrew's Codex has it, and the release commands below install both
+(run them again to add it to a Codex installed without it).
 
 If you have Homebrew, use it (it checks the download's digest):
 
@@ -139,11 +141,14 @@ Otherwise the release binary, for whichever chip the Mac has, needing nothing el
   set -eu
   case "$(uname -m)" in arm64) arch=aarch64 ;; x86_64) arch=x86_64 ;; *) echo "unsupported chip" >&2; exit 1 ;; esac
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-  asset="codex-${arch}-apple-darwin"
-  curl -fSL "https://github.com/openai/codex/releases/latest/download/${asset}.tar.gz" -o "$tmp/codex.tar.gz"
-  tar -xzf "$tmp/codex.tar.gz" -C "$tmp"
   mkdir -p "$HOME/.local/bin"
-  install -m 755 "$tmp/$asset" "$HOME/.local/bin/codex"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/openai/codex/releases/latest)"; tag="${tag##*/}"
+  for name in codex codex-code-mode-host; do                # both from the same release
+    asset="${name}-${arch}-apple-darwin"
+    curl -fSL "https://github.com/openai/codex/releases/download/${tag}/${asset}.tar.gz" -o "$tmp/$name.tar.gz"
+    tar -xzf "$tmp/$name.tar.gz" -C "$tmp"
+    install -m 755 "$tmp/$asset" "$HOME/.local/bin/$name"
+  done
 )
 ```
 

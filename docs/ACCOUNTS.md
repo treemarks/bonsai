@@ -43,7 +43,7 @@ in your login Keychain, Codex's in its own `auth.json`, exactly where the CLIs p
 `--institution` marks the seat `⌂` on the board. The mark is your declaration: a successful
 sign-in does not verify that you picked the university workspace, and neither proves approval for
 any data. `auto` spends a marked seat like any login, in the order your `prefer` setting gives
-([Usage](USAGE.md#which-login-a-job-takes)); a named target (`stanford-codex`) always means that
+([Usage](USAGE.md), "Choosing an account"); a named target (`stanford-codex`) always means that
 seat.
 
 After each sign-in Bonsai prints what actually signed in (for Claude the e-mail, organization and
@@ -76,7 +76,10 @@ routing words (`auto`, `codex`, `openai`, `astra`, ...) are refused as names. `-
   one login a job is handed is the one it was given.
 - **Network:** Bonsai's own is `git fetch` (during an update, and once a day from the live board in a terminal, to
   see whether a new version is out) and, for the board's MODEL column, a request to Ollama on this Mac
-  (`http://127.0.0.1:11434`, no proxy). Everything else is the CLIs'. An update you approve runs the new code, so
+  (`http://127.0.0.1:11434`, no proxy). Everything else is the CLIs'. A job has no web unless you add `--web`
+  (ChatGPT jobs, never with `-f`): then it may search OpenAI's cached web index, its searches go to OpenAI, it opens
+  no live page, and Codex's code-mode host (its JavaScript runner, how it reaches search) is on for that job. A
+  planted-token test with it on read nothing, though its patch tool can test whether a guessed line is in a file. An update you approve runs the new code, so
   update only from github.com/treemarks/bonsai (Bonsai prints the source and merges exactly the commits it listed).
 - **What stays on this Mac:** sign-ins in each login's folder (anything running as you can read file-based ones;
   separate folders choose an account, they don't wall one off); the job ledger (ids, times, login, outcome, not your

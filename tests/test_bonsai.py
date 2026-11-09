@@ -800,7 +800,7 @@ class JobPaths(unittest.TestCase):
         bonsai.refresh = refresh or (lambda cfg, force=False: {"rows": [dict(r) for r in rows]})
         bonsai.read_usage_now = read or bonsai.read_usage_now
         bonsai.require = lambda *a, **k: None
-        bonsai.headless_argv = lambda prov, model, effort, o, cwd: [sys.executable, "-c", script, o or ""]
+        bonsai.headless_argv = lambda prov, model, effort, o, cwd, web=False: [sys.executable, "-c", script, o or ""]
         if read is None:
             bonsai.record_reading("default", {"status": "", "source": "usage"})     # a fresh reading: no /usage read here
         elif os.path.exists(os.path.join(os.environ["BONSAI_STATE"], "claude_usage.json")):
@@ -1175,6 +1175,35 @@ class SecurityGuards(unittest.TestCase):
                     p.kill()
             subprocess.Popen = real
         self.assertEqual(seen, ["refused"])
+
+    def test_web_is_the_cached_search_and_only_on_request(self):
+        cwd = tempfile.mkdtemp()
+        plain = bonsai._codex_job_argv("gpt-x", "low", None, cwd)
+        web = bonsai._codex_job_argv("gpt-x", "low", None, cwd, web=True)
+        self.assertIn('web_search="disabled"', plain)
+        self.assertIn('web_search="cached"', web)
+        self.assertNotIn('web_search="disabled"', web)
+        self.assertNotIn('web_search="live"', web)
+        self.assertIn("features.code_mode_host=false", plain)                 # the JS host: on only for --web
+        self.assertNotIn("features.code_mode_host=false", web)
+        self.assertIn("features.shell_snapshot=false", web)
+        self.assertIn('web_search="disabled" is not set', bonsai.codex_problems(web, cwd))   # not without --web
+        self.assertFalse([p for p in bonsai.codex_problems(web, cwd, web=True) if "web_search" in p])
+        self.assertTrue([p for p in bonsai.codex_problems(plain, cwd, web=True) if "web_search" in p])
+        on = [x.replace("features.code_mode_host=false", "features.code_mode_host=true") for x in plain]
+        self.assertTrue([p for p in bonsai.codex_problems(on, cwd) if "code-mode host" in p])
+        with self.assertRaises(bonsai.LaunchRefused):
+            bonsai.require("claude", ["claude"], cwd, web=True)
+
+    def test_web_takes_no_files_and_no_claude(self):
+        import argparse
+        base = dict(model=None, pool=None, effort=None, data=None, dry_run=True, out=None, timeout=None, web=True)
+        one = "--web takes the question as its one argument"
+        for target, files, prompt, said in (("chatgpt", ["notes.md"], "hi", one), ("chatgpt", None, "-", one),
+                                            ("chatgpt", None, None, one), ("claude", None, "hi", "is for ChatGPT")):
+            with self.subTest(target=target, files=files, prompt=prompt), self.assertRaises(SystemExit) as cm:
+                bonsai.cmd_job(argparse.Namespace(target=target, file=files, prompt=prompt, **base), {})
+            self.assertIn(said, str(cm.exception))
 
     def test_update_merges_only_the_commit_that_was_reviewed(self):
         import argparse, io

@@ -17,7 +17,8 @@ run with Apple's Python and nothing installed: `/usr/bin/python3 -m unittest dis
 ## Fixed since 0.2.5
 
 - Jobs run in an empty folder with every tool switch each CLI offers turned off (shell, files, web, images, apps,
-  plugins, sub-agents); Bonsai hands a job files only through `-f`, which refuses sign-in and key files. A CLI
+  plugins, sub-agents; a ChatGPT job may search OpenAI's cached index only when asked with `--web`, which also turns on
+  Codex's JavaScript host that search runs through, and then takes no files); Bonsai hands a job files only through `-f`, which refuses sign-in and key files. A CLI
   version can add a tool Bonsai does not yet know to switch off (see below).
 - A sign-in that came back as another account is marked, and no job uses it.
 - `bonsai update` shows the new commits and changes nothing until you say yes.
