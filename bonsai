@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # GENERATED FILE: do not edit here. Built from the Treemarks pool gauge's shared core and Bonsai's own modules,
-# under the profile `stanford`; version 0.5.1, source ce9fc636b516. A fix lands in those sources and is
+# under the profile `stanford`; version 0.5.2, source 94991f2e5131. A fix lands in those sources and is
 # published here, so a pull request on this file is read as a report (docs/DEVELOPMENT.md).
 # Issues: https://github.com/treemarks/bonsai
 """bonsai — a little Treemarks.
@@ -75,9 +75,9 @@ CONFIG_PATH = os.environ.get("BONSAI_CONFIG") or (
     os.path.join(os.environ.get("APPDATA") or HOME, "bonsai", "config.json") if IS_WIN
     else os.path.join(HOME, ".config", "bonsai", "config.json"))
 DEFAULT_INTERVAL = 300       # seconds between probes; the floor is 180
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 # The build writes the source digest (what the file was built from) and the profile here; "dev" is an unbuilt tree.
-BUILD = {"source": "ce9fc636b516", "profile": "stanford"}
+BUILD = {"source": "94991f2e5131", "profile": "stanford"}
 
 # How to get each tool on a machine that has nothing. `bonsai doctor` prints the line for
 # whatever is missing. The two CLIs have installers that need neither Homebrew nor Node.
@@ -1133,12 +1133,12 @@ CODEX_WEB_SEARCH = 'web_search="cached"'
 CODEX_APPROVAL = 'approval_policy="never"'
 CODEX_REQUIRED_FLAGS = ("--ephemeral", "--ignore-user-config", "--ignore-rules")
 _CONTEXT_MARKERS = (".git", ".claude", ".mcp.json", "CLAUDE.md", "AGENTS.md", ".agents", ".codex")
-_HOME_CONFIG = (".claude", ".codex")
-CWD_PREFIX = "bonsai-job-"
 # The home folder's .agents holds Codex's user skills (`bonsai install-skill` writes one there), read wherever a call
-# starts, so holding it adds nothing to a job: allowed in the home folder like .claude and .codex. That matters where
-# a job's temp folder sits inside home: always on Windows, and on a Mac whose TMPDIR is under home (a CI runner's).
-_HOME_SKILLS = (".agents",)
+# starts, so holding it adds nothing to a job: allowed in the home folder like .claude and .codex, as in the fleet's
+# list. That matters where a job's temp folder sits inside home: always on Windows, and on a Mac whose TMPDIR is under
+# home (a CI runner's).
+_HOME_CONFIG = (".claude", ".codex", ".agents")
+CWD_PREFIX = "bonsai-job-"
 
 
 class LaunchRefused(RuntimeError):
@@ -1184,7 +1184,7 @@ def _cwd_problems(cwd, allowed_files: tuple = ()) -> list:
         problems.append("the working folder is not empty (%d entries it should not hold)" % len(extra))
     home = Path(os.path.realpath(Path.home()))
     for folder in (path, *path.parents):
-        markers = [m for m in _CONTEXT_MARKERS if not (folder == home and m in _HOME_CONFIG + _HOME_SKILLS)]
+        markers = [m for m in _CONTEXT_MARKERS if not (folder == home and m in _HOME_CONFIG)]
         held = [m for m in markers if (folder / m).exists()]
         if held:
             problems.append("the working folder sits in or under a folder holding %s" % ", ".join(held)
@@ -2051,6 +2051,7 @@ class Job:
         finally:
             if not t.is_alive():                   # a stopped step's thread may still run: the refusing launcher stays
                 subprocess.Popen = real
+        self.check()                               # a step that ended before the first wait is held to the same stop
         if "e" in box:
             raise box["e"]
         return box["v"]
